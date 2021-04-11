@@ -1,0 +1,5 @@
+.*.sw?
+*~
+nightly-junk/
+nightly-junk/patch-current.diff
+SCPTARGET.sh
