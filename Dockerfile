@@ -3,7 +3,7 @@ LABEL maintainer="jholland@akamai.com"
 
 ARG USER_ID
 ARG GROUP_ID
-ARG PATCHFILE
+ARG PATCH
 
 ENV container docker
 ENV LANG C.UTF-8
@@ -25,7 +25,9 @@ RUN apt-get update && \
       vim
 
 COPY cb-start.sh /tmp/cb-start.sh
-COPY ${PATCHFILE} /tmp/patch.diff
+COPY ${PATCH} /tmp/patch.diff
+
+RUN echo "cbuilder ALL=NOPASSWD: ALL" | tee -a /etc/sudoers
 
 # The container does a build that tries to use the host's uids, based on: 
 # https://jtreminio.com/blog/running-docker-containers-as-current-host-user/#ok-so-what-actually-works
