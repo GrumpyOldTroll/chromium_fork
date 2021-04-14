@@ -23,14 +23,10 @@
 #   https://github.com/chromium/chromium)
 # ARGSFILE: if set and file present it will use this as args.gn
 #   instead of the default.
-# PATCHURL: if set it will curl this and git apply it.  You can get
-#   these from github commits, e.g.:
-#   https://github.com/GrumpyOldTroll/chromium/commit/da79e14e808debadfd1743222bcacd7dad41fdbe.patch
-# PATCHFILE: environment variable, if set and file present it will
+# PATCHSPEC: environment variable, exclusive with PATCHFILE.  This will
+#   set PATCHFILE=/tmp/patch.diff, and will generate the 
 #   git apply it. The git apply happens in a "patched_build" branch
 #   forked from the latest common ancestor of $VERSION and main.
-#   NB: if both PATCHURL and PATCHFILE are set it will error. PATCHURL
-#       fetches early to /tmp/patch.diff and uses PATCHFILE internally.
 # LASTGOOD: environment variable that applies the patch first to a
 #   specific version, then tries to rebase VERSION on top of it.  When
 #   patches fail, this allows for fixing afterward in a more normal
@@ -41,11 +37,13 @@ set -e
 DIR=/bld
 export PATH="${PATH}:${DIR}/depot_tools"
 
-if [ -d ${DIR}/src ]; then
-    bash ; exit
 # you should be able to do a docker start -i <container> to come back up
 # in an interactive shell and troubleshoot after a failed build (this is
 # the purpose of this weird bash call when /bld is already present.)
+if [ -d ${DIR}/src ]; then
+  cd ${DIR}/src
+  bash
+  exit
 fi
 
 early_stop=0
@@ -55,28 +53,24 @@ if [ "${ARGSFILE}" != "" -a ! -f "${ARGSFILE}" ]; then
     early_stop=1
 fi
 
-if [ "${PATCHFILE}" != "" -a ! -f "${PATCHFILE}" ]; then
-    echo "error: PATCHFILE not present, please unset or get the file in place and re-run"
-    echo "PATCHFILE=\"${PATCHFILE}\""
-    early_stop=1
+if [ "${PATCHFILE}" = "" -a "${PATCHSPEC}" = "" ]; then
+    echo "error: PATCHFILE and PATCHSPEC both not set, please pass one to cb-start.sh"
+    exit 1
 fi
 
-if [ "${PATCHURL}" != "" -a "${PATCHFILE}" != "" ]; then
-    echo "error: PATCHURL and PATCHFILE should not both be set, please unset one and re-run"
-    echo "PATCHURL=\"${PATCHURL}\""
+if [ "${PATCHFILE}" != "" -a "${PATCHSPEC}" != "" ]; then
+    echo "error: PATCHFILE=${PATCHFILE} and PATCHSPEC=${PATCHSPEC} both set, please pass only one to cb-start.sh"
+    exit 1
+fi
+
+if [ "${PATCHFILE}" != "" -a ! -f "${PATCHFILE}" ]; then
+    echo "error: ${PATCHFILE} not present, please unset or get the file in place and re-run"
     echo "PATCHFILE=\"${PATCHFILE}\""
     early_stop=1
 fi
 
 if [ "${early_stop}" != "0" ]; then
     exit 1
-fi
-
-if [ "${GITEMAIL}" = "" ]; then
-  GITEMAIL="jholland@akamai.com"
-fi
-if [ "${GITNAME}" = "" ]; then
-  GITNAME="Jake Holland"
 fi
 
 # from https://stackoverflow.com/a/22373735/3427357
@@ -95,66 +89,52 @@ LASTGOOD=${LASTGOOD}
 CHAN=${CHAN}
 EOF
 
-if [ "${PATCHURL}" != "" ]; then
-  PATCHFILE=/tmp/patch.diff
-  echo "fetching PATCHURL=\"${PATCHURL}\""
-  curl -q -s --fail > ${PATCHFILE}
-else
-  PATCHURL="(local file)"
-fi
-
 set -x
 
 cd ${DIR}
 git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
 
 fetch chromium
+# build instructions say to do the below instead, but it fails.
 #fetch --nohooks chromium
+# https://chromium.googlesource.com/chromium/src/+/master/docs/linux/build_instructions.md#get-the-code
+# --jake 2021-03-15
 
 cd src
 git checkout ${VERSION}
-if [ "${PATCHFILE}" != "" -a -f ${PATCHFILE} ]; then
-  git config user.email "${GITEMAIL}"
-  git config user.name "${GITNAME}"
-  PATCHID=$(shasum ${PATCHFILE} | awk '{print $1};')
-  if [ "${PATCHURL}" != "" ]; then
-    PATCHID="${PATCHID}(${PATCHURL})"
-  else
-    PATCHID="${PATCHID}(${PATCHFILE})"
-  fi
-  echo "PATCHID=\"${PATCHID}\"" >> /tmp/env.sh
-  if [ "${LASTGOOD}" != "" ]; then
-    # wind back to last common commit as the merge base to avoid DEPS and chrome/VERSION conflicts
-    VERSIONBRANCH=$(git merge-base main ${VERSION})
-    LASTGOODBRANCH=$(git merge-base main ${LASTGOOD})
-    echo "VERSIONBRANCH=${VERSIONBRANCH}" >> /tmp/env.sh
-    echo "LASTGOODBRANCH=${LASTGOODBRANCH}" >> /tmp/env.sh
 
-    # TBD: it's possible that a different patch is needed for the last
-    # common ancestor vs. the current head of the branch, so maybe I need
-    # 2 patches here?
-    # the issue is that merging directly from a last good commit to a new
-    # commit gets a bunch of spurious errors in DEPS and chrome/VERSION,
-    # and patching on top of a common ancestor in main does not (as these
-    # version-specific things are added only to the version branches)
+mkdir -p out/Default
 
-    git checkout -b patched_build ${LASTGOODBRANCH}
-    git apply ${PATCHFILE}
-
-    git add -A
-    git commit -m "automated apply of version ${LASTGOOD} patch ${PATCHID}"
-    # TBD: should this run as 2 separate stages?  they can both fail then,
-    # which means a 2-step fix.  If I need 2 patches, above, I probably
-    # need 2 stages here, but I think I'll put it off until it happens a
-    # few times.
-    # git rebase ${VERSIONBRANCH}
-    git rebase ${VERSION}
-  else
-    git checkout -b patched_build
-    git apply ${PATCHFILE}
-    git add .
-  fi
+if [ "${ARGSFILE}" != "" -a -f "${ARGSFILE}" ]; then
+    cp "${ARGSFILE}" out/Default/args.gn
+else
+    cat > out/Default/args.gn <<EOF
+is_debug=false
+is_component_build=false
+blink_symbol_level=1
+symbol_level=1
+enable_nacl=false
+enable_linux_installer=true
+ffmpeg_branding="Chrome"
+proprietary_codecs=true
+EOF
 fi
 
-. /root/cb-continue.sh
+git remote add multicast https://github.com/GrumpyOldTroll/chromium.git
+git fetch multicast --tags
 
+if [ "${PATCHSPEC}" != "" ]; then
+  PATCHFILE=/bld/src/out/Default/patch.diff
+  git diff ${PATCHSPEC} > ${PATCHFILE}
+fi
+echo "DIFF_SHA256=\"$(shasum -a 256 ${PATCHFILE} | awk '{print $1;}')\"" > out/Default/DIFF_SHA.sh
+cp /tmp/env.sh out/Default/
+
+./build/install-build-deps.sh --no-prompt
+gclient sync
+
+git apply ${PATCHFILE}
+
+gn gen out/Default
+autoninja -C out/Default chrome
+ninja -C out/Default "chrome/installer/linux:unstable_deb"

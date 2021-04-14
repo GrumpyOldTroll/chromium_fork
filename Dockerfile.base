@@ -3,7 +3,6 @@ LABEL maintainer="jholland@akamai.com"
 
 ARG USER_ID
 ARG GROUP_ID
-ARG PATCH
 
 ENV container docker
 ENV LANG C.UTF-8
@@ -25,7 +24,8 @@ RUN apt-get update && \
       vim
 
 COPY cb-start.sh /tmp/cb-start.sh
-COPY ${PATCH} /tmp/patch.diff
+PATCH_LINE1
+PATCH_LINE2
 
 RUN echo "cbuilder ALL=NOPASSWD: ALL" | tee -a /etc/sudoers
 
@@ -40,8 +40,12 @@ RUN if [ ${USER_ID:-0} -ne 0 ] && [ ${GROUP_ID:-0} -ne 0 ]; then \
     install -d -m 0755 -o cbuilder -g cbuilder /home/cbuilder && \
     chown --changes --silent --no-dereference --recursive \
           --from=33:33 ${USER_ID}:${GROUP_ID} \
-      /tmp/patch.diff \
-      /tmp/cb-start.sh \
+      /tmp/cb-start.sh && \
+    if [ -f /tmp/patch.diff ]; then \
+      chown --changes --silent --no-dereference --recursive \
+            --from=33:33 ${USER_ID}:${GROUP_ID} \
+        /tmp/patch.diff ;\
+    fi \
 ;fi
         
 USER cbuilder

@@ -49,23 +49,29 @@ if [ "${VER}" = "" ]; then
   fi
   VER=$(cat ${JF}| jq -r ".[].versions[] | select(.os==\"linux\") | select(.channel==\"$CHAN\") | .version" | head -1)
   BRANCH=$(cat ${JF}| jq -r ".[].versions[] | select(.os==\"linux\") | select(.channel==\"$CHAN\") | .branch_commit" | head -1)
+  echo "pulled VER=${VER} (BRANCH=${BRANCH}) from release info at https://omahaproxy.appspot.com/all.json" | tee -a ${LOGF}
+  AUTOUPDATE_LASTGOOD=1
 else
-  BRANCH="manual-VER-${VER}-no-BRANCH"
+  echo "explicit override of version: VER=${VER}" | tee -a ${LOGF}
+  BRANCH="manual-VER-${VER}-NO-EXPLICIT-BRANCH"
+  if [ "${POST}" = "1" ]; then
+    AUTOUPDATE_LASTGOOD=1
+  else
+    AUTOUPDATE_LASTGOOD=0
+  fi
 fi
 
 . LAST_GOOD.${CHAN}.sh
 
-if [ "${LAST_GOOD_DIFF_URL}" != "" -a "${LAST_GOOD_DIFF_FILE}" != "" ]; then
-  echo "$(date) both LAST_GOOD_DIFF_FILE (${LAST_GOOD_DIFF_FILE}) and LAST_GOOD_DIFF_URL (${LAST_GOOD_DIFF_URL}) are set, please unset one" | tee -a ${LOGF}
-  exit 1
+if [ "${USE_PATCH}" != "" ]; then
+  echo "explicit override on patch: setting LAST_GOOD_DIFF_FILE=${USE_PATCH} instead of ${LAST_GOOD_DIFF_FILE}" | tee -a ${LOGF}
+  LAST_GOOD_DIFF_FILE="${USE_PATCH}"
+  LAST_GOOD_DIFF_SPEC=""
 fi
 
-if [ "${LAST_GOOD_DIFF_URL}" != "" ]; then
-  LAST_GOOD_DIFF_FILE=${WORK}/patch.diff
-  if ! curl -q -f -s "${LAST_GOOD_DIFF_URL}" > "${LAST_GOOD_DIFF_FILE}" ; then
-    echo "$(date) failed curl of ${LAST_GOOD_DIFF_URL} to pull last good diff to ${LAST_GOOD_DIFF_FILE}" | tee -a ${LOGF}
-    exit 1
-  fi
+if [ "${LAST_GOOD_DIFF_SPEC}" != "" -a "${LAST_GOOD_DIFF_FILE}" != "" ]; then
+  echo "$(date) both LAST_GOOD_DIFF_FILE (${LAST_GOOD_DIFF_FILE}) and LAST_GOOD_DIFF_SPEC (${LAST_GOOD_DIFF_SPEC}) are set, please unset one" | tee -a ${LOGF}
+  exit 1
 fi
 
 if [ "${LAST_GOOD_DIFF_FILE}" != "" -a ! -f "${LAST_GOOD_DIFF_FILE}" ]; then
@@ -73,25 +79,29 @@ if [ "${LAST_GOOD_DIFF_FILE}" != "" -a ! -f "${LAST_GOOD_DIFF_FILE}" ]; then
     exit 1
 fi
 
-ABS_LAST_GOOD_DIFF=$(python -c "from os.path import abspath; print(abspath('${LAST_GOOD_DIFF_FILE}'))")
-CUR_SHA256=$(shasum -a 256 ${LAST_GOOD_DIFF_FILE} | awk '{print $1;}')
+#ABS_LAST_GOOD_DIFF=$(python -c "from os.path import abspath; print(abspath('${LAST_GOOD_DIFF_FILE}'))")
+#CUR_SHA256=$(shasum -a 256 ${LAST_GOOD_DIFF_FILE} | awk '{print $1;}')
 
-if [ "${CUR_SHA256}" = "${LAST_GOOD_DIFF_SHA256}" -a "${LAST_GOOD_TAG}" = "${VER}" -a "${LAST_GOOD_BRANCH}" = "${BRANCH}" ]; then
+#if [ "${CUR_SHA256}" = "${LAST_GOOD_DIFF_SHA256}" -a "${LAST_GOOD_TAG}" = "${VER}" -a "${LAST_GOOD_BRANCH}" = "${BRANCH}" ]; then
+#    echo "$(date) chromium channel=${CHAN} is unchanged from last good: VER=${VER}, BRANCH=${BRANCH}" | tee -a ${LOGF}
+#    exit 1
+#fi
+
+if [ "${LAST_GOOD_TAG}" = "${VER}" -a "${LAST_GOOD_BRANCH}" = "${BRANCH}" -a "${LAST_GOOD_DIFF_SPEC}" != "" ]; then
     echo "$(date) chromium channel=${CHAN} is unchanged from last good: VER=${VER}, BRANCH=${BRANCH}" | tee -a ${LOGF}
     exit 1
 fi
 
 echo "${CHAN} build ${VER} start at $(date)" | tee -a ${LOGF}
 
-echo "LAST_GOOD_TAG=${VER}" > ${WORK}/PROPOSED.${CHAN}.sh
-if [ "${LAST_GOOD_DIFF_URL}" != "" ]; then
-  echo "LAST_GOOD_DIFF_URL=\"${LAST_GOOD_DIFF_URL}\"" >> ${WORK}/PROPOSED.${CHAN}.sh
+echo "" > ${WORK}/PROPOSED.${CHAN}.sh
+if [ "${LAST_GOOD_DIFF_SPEC}" != "" ]; then
+  echo "LAST_GOOD_DIFF_SPEC=\"${LAST_GOOD_DIFF_SPEC}\"" >> ${WORK}/PROPOSED.${CHAN}.sh
   echo "#LAST_GOOD_DIFF_FILE=" >> ${WORK}/PROPOSED.${CHAN}.sh
 else
-  echo "#LAST_GOOD_DIFF_URL=" >> ${WORK}/PROPOSED.${CHAN}.sh
+  echo "#LAST_GOOD_DIFF_SPEC=" >> ${WORK}/PROPOSED.${CHAN}.sh
   echo "LAST_GOOD_DIFF_FILE=\"${LAST_GOOD_DIFF_FILE}\"" >> ${WORK}/PROPOSED.${CHAN}.sh
 fi
-echo "LAST_GOOD_DIFF_SHA256=${CUR_SHA256}" >> ${WORK}/PROPOSED.${CHAN}.sh
 echo "LAST_GOOD_BRANCH=${BRANCH}" >> ${WORK}/PROPOSED.${CHAN}.sh
 
 if [ "$SILENT" != "" ]; then
@@ -110,15 +120,23 @@ set -x
 DKR=docker
 
 ${DKR} pull ubuntu:focal
-#cat Dockerfile.base \
-#  | sed -e "s@PATCHFILE@${LAST_GOOD_DIFF_FILE}@" \
+
+if [ "${LAST_GOOD_DIFF_SPEC}" != "" ]; then
+  cat Dockerfile.base \
+    | sed -e "s@PATCH_LINE1@ENV PATCHSPEC=\"${LAST_GOOD_DIFF_SPEC}\"@" \
+    | sed -e "s@PATCH_LINE2@@" \
+    > ${WORK}/Dockerfile.${CHAN}
+else
+  cat Dockerfile.base \
+    | sed -e "s@PATCH_LINE1@ENV PATCHFILE=\"/tmp/patch.diff\"@" \
+    | sed -e "s@PATCH_LINE2@COPY ${LAST_GOOD_DIFF_FILE} /tmp/patch.diff@" \
+    > ${WORK}/Dockerfile.${CHAN}
+fi
 #  | sed -e "s@PROPOSEDFILE@${WORK}/PROPOSED.${CHAN}.sh@" \
-#  > ${WORK}/Dockerfile.${CHAN}.latest
 #${DKR} build --file ${WORK}/Dockerfile.${CHAN}.latest --tag ${CI}:latest .
-${DKR} build --file Dockerfile \
+${DKR} build --file ${WORK}/Dockerfile.${CHAN} \
   --build-arg USER_ID=$(id -u ${USER}) \
   --build-arg GROUP_ID=$(id -g ${USER}) \
-  --build-arg PATCHFILE=${LAST_GOOD_DIFF_FILE} \
   --tag ${CI}:latest .
 
 BLDDIR=$(mktemp -d -t chrome-build-XXXXXX)
@@ -134,26 +152,45 @@ ${DKR} run --name ${CN} -it \
 	--env VERSION=${VER} \
 	--env LASTGOOD=${LAST_GOOD_TAG} \
 	--env CHAN=${CHAN} \
-	--env PATCHFILE=/tmp/patch.diff \
   -v ${BLDDIR}:/bld \
 	-v /run/snapd.socket:/run/snapd.socket ${CI}:latest
 
+echo "LAST_GOOD_TAG=${VER}" >> ${WORK}/PROPOSED.${CHAN}.sh
 # docker cp ${CN}:where-the-.deb-is .
 #${DKR} cp ${CN}:/bld/src/out/Default/chromium-browser-mc-unstable_${VER}-1_amd64.deb ${WORK}/
-cp ${WORK}/bld/src/out/Default/chromium-browser-mc-unstable_${VER}-1_amd64.deb ${WORK}
+OUTFNAME=chromium-browser-mc-unstable_${VER}-1_amd64.deb
+mv ${WORK}/bld-${CHAN}/src/out/Default/${OUTFNAME} ${WORK}/
 
-mv ${WORK}/PROPOSED.${CHAN}.sh LAST_GOOD.${CHAN}.sh
+# we expect this file to be built by the docker container, and for it
+# to set DIFF_SHA256.
+cp ${WORK}/bld-${CHAN}/src/out/Default/DIFF_SHA.sh ${WORK}/DIFF_SHA.${CHAN}.sh
+. ${WORK}/DIFF_SHA.${CHAN}.sh
+echo "LAST_GOOD_DIFF_SHA256=\"${DIFF_SHA256}\"" >> ${WORK}/PROPOSED.${CHAN}.sh
+echo "LAST_GOOD_DEB_SHA256=\"$(shasum -a 256 ${WORK}/${OUTFNAME} | awk '{print $1;}')\"" >> ${WORK}/PROPOSED.${CHAN}.sh
 
-# ${DKR} rm ${CN}
 ${DKR} image prune -f
+${DKR} rm ${CN}
 
-git add LAST_GOOD.${CHAN}.sh
-git commit -m "auto-updated ${CHAN} at ${STARTTIME} from ${LAST_GOOD_TAG} to ${VER}"
+if [ "${AUTOUPDATE_LASTGOOD}" = "1" ]; then
+  ROTATION=10
+  # SCPTARGET (not checked in) has the login info, file system location
+  # prefix, and associated url prefix for uploading to origin and
+  # downloading via https, and it likely looks something like this:
+  # SCPTARGET=who@where
+  # SCPPREFIX=/var/www/whatever/
+  # SCPURLBASE=https://where/whatever
+  . SCPTARGET.sh
+  scp ${WORK}/${OUTFNAME} ${SCPTARGET}:${SCPPREFIX}chromium-builds/${CHAN}/
+  ssh ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" | \
+    tail -n +${ROTATION} | sed -e "s@\(.*\)@${SCPPREFIX}chromium-builds/${CHAN}/\1@" | \
+    xargs -r ssh ${SCPTARGET} rm
+  ssh ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" |
+    sed -e "s@\(.*\)@ * ${SCPURLBASE}/chromium-builds/${CHAN}/\1@" > \
+    CURRENT_BINARIES.${CHAN}.md
+  mv ${WORK}/PROPOSED.${CHAN}.sh LAST_GOOD.${CHAN}.sh
+  git add LAST_GOOD.${CHAN}.sh CURRENT_BINARIES.${CHAN}.md
+  git commit -m "auto-updated ${CHAN} at ${STARTTIME} (LAST_GOOD from ${LAST_GOOD_TAG} to ${VER})"
+fi
 
-. SCPTARGET.sh
-scp ${WORK}/chromium-browser-mc-unstable_${VER}-1_amd64.deb ${SCPTARGET}
-
-#sudo dpkg --remove chromium-browser-mc-unstable
-#sudo dpkg --install ./chromium-browser-unstable_90.0.4430.11+multicast-1_amd64.deb
-
-
+rm -rf $(readlink ${WORK}/bld-${CHAN})
+rm ${WORK}/bld-${CHAN}
