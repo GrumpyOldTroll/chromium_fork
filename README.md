@@ -27,8 +27,7 @@ Whenever that fails, or whenever there's new edits to the multicast API feature,
 
  * [multicast-base](https://github.com/GrumpyOldTroll/chromium/tree/multicast-base) is where the baseline multicast implementation is to be developed.  This should remain a branch with a usable history about the multicast-API-related changes, uncorrupted by a lot of version and merge-related junk (though there will likely be several hopefully-minor ones where changes are needed to stay integrated with the upstream).  This branch starts from a specific commit off main, and it rebases to new main commits that are the [merge base](https://git-scm.com/docs/git-merge-base) commits for new release branches from the upstream.  Feature work should generally branch from here, do the dev work, rebase from this branch (in case it moved), and then merge the change into this branch, then make sure the last good url points to commits that incorporate these changes. (That may require making a tag based on a rebase of this branch up to the current last known good version before these changes were applied.)
    * This branch should specifically avoid pulling any of the version-specific changes to DEPS or chrome/VERSION in upstream release branches (to the point that we might break history to reverse this if it happens by accident, as it seems to make rebasing very painful). In general, this is done by being careful to rebase only to commits from upstream-main, not any version branches.
- * multicast-patch-\<version\> gets created for version branches when they have merge conflicts or build or runtime errors that need fixing on top of multicast-base in order to rebase to a release tag's commit.  Usually these fixes can be done in multicast-base instead, but sometimes they might need a branch.
- * [multicast-stable-tracking](https://github.com/GrumpyOldTroll/chromium/tree/multicast-stable-tracking) is updated when the upstream stable release changes.  This is equivalent to "multicast-patches-\<version\>" for the version of the latest stable release (89.0.4389 at the time of this writing), but we carry it with an abstracted name, and even if there are no fixes needed because the stable release gets thousands of updates such that a rebase of a branch containing the multicast changes from the point where it branched from main to the release tag can take minutes to apply.  When the base version for the stable release branch changes upstream, this will get renamed in to multicast-patches-\<version\> and a new branch will be created for the new stable branch, and it will be named multicast-stable-tracking.  Since this is a history-breaking strategy, substantial work should not generally be done forking from this branch, this is intended generally just to cache the integration patchs specific to the stable release.
+ * multicast-patch-\<version\> gets created for version branches when they have merge conflicts or build or runtime errors that need fixing on top of multicast-base in order to rebase to a release tag's commit.  Usually these fixes can be done in multicast-base instead, but sometimes they might need a branch.  These are also created for the stable branch even if there are no fixes needed because the stable release gets thousands of updates such that a rebase of a branch containing the multicast changes from the point where it branched from main to the release tag can take minutes to apply.
  * [upstream-main](https://github.com/GrumpyOldTroll/chromium/tree/upstream-main) exactly tracks the [upstream main](https://chromium.googlesource.com/chromium/src/+/refs/heads/main) branch, lagging behind by hopefully-less-than-a-week.  It should never contain anything different than the upstream main.  If it accidentally diverges for some reason, we'll break history on this branch to put it back in sync.
 
 We don't keep a branch for tracking dev releases like we do for stable because the rebranching off main for a new dev release happens too often.  However, branching off multicast-base and rebasing to the latest dev tag from upstream is generally equivalent to what that branch would be, for the latest dev build.
@@ -274,25 +273,6 @@ $ echo ${BP}
 $ git tag -a -m "Branch point for adding multicast to ${BP} releases." mcbp-${BP}
 ~~~
 
-### Special Stable Handling
-
-For the rare occasions you're moving the branch point forward for a build against a `stable` upstream release, you also update the stable tracking branch (generally this is *instead of* updating multicast-base):
-
-~~~
-BP=$(echo ${VERSION} | cut -f -3 -d.)
-OLDSTABLE=${LASTGOOD}
-OLDBP=$(echo ${OLDSTABLE} | cut -f -3 -d.)
-git checkout --track multicast/multicast-stable-tracking
-git branch -m multicast-stable-tracking multicast-patch-${OLDBP}
-
-# make a new branch where it forks from main:
-git checkout mcbp-${OLDBP}
-git switch -c multicast-stable-tracking
-git rebase mcbp-${BP}
-# rebase it to the current version of the stable branch:
-git rebase ${VERSION}
-~~~
-
 ### Mapping Onto a Release Tag
 
 After the above step (or if the above step was not necessary because the new version is in the same branch as the prior version) the `git merge-base main` for the multicast-base branch and the target VERSION tag.
@@ -416,12 +396,12 @@ git push multicast mc-${VERSION}
 git push multicast mcbp-${BP}
 ~~~
 
-If you created any patch branches that should persist, or moved multicast-stable-tracking or multicast-base, push those:
+If you created any patch branches that should persist or moved multicast-base, push those:
 
 ~~~
 git push multicast multicast-base
-git push multicast multicast-stable-tracking
 git push multicast multicast-patch-${BP}
+git push multicast multicast-patch-${OLDBP}
 ~~~
 
 ### Updating the Patch Spec
