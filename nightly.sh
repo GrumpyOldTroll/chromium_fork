@@ -89,7 +89,7 @@ fi
 
 if [ "${LAST_GOOD_TAG}" = "${VER}" -a "${LAST_GOOD_BRANCH}" = "${BRANCH}" -a "${LAST_GOOD_DIFF_SPEC}" != "" ]; then
     echo "$(date) chromium channel=${CHAN} is unchanged from last good: VER=${VER}, BRANCH=${BRANCH}" | tee -a ${LOGF}
-    exit 1
+    exit 0
 fi
 
 echo "${CHAN} build ${VER} start at $(date)" | tee -a ${LOGF}
