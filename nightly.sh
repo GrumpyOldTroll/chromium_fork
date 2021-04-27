@@ -148,19 +148,22 @@ ln -s ${BLDDIR} ${WORK}/bld-${CHAN}
 # https://github.com/ogra1/snapd-docker/blob/master/build.sh, however it
 # seems to need a different entrypoint that's less convenient for my usage,
 # so I do it this way, which uses the host's snap socket. --jake 2021-03-20
-${DKR} run --name ${CN} -it \
+${DKR} run --name ${CN} -d \
 	--env VERSION=${VER} \
 	--env LASTGOOD=${LAST_GOOD_TAG} \
 	--env CHAN=${CHAN} \
   -v ${BLDDIR}:/bld \
 	-v /run/snapd.socket:/run/snapd.socket ${CI}:latest
 
-echo "LAST_GOOD_TAG=${VER}" >> ${WORK}/PROPOSED.${CHAN}.sh
-# docker cp ${CN}:where-the-.deb-is .
+${DKR} logs -f ${CN}
+
 #${DKR} cp ${CN}:/bld/src/out/Default/chromium-browser-mc-unstable_${VER}-1_amd64.deb ${WORK}/
 OUTFNAME=chromium-browser-mc-unstable_${VER}-1_amd64.deb
 mv ${WORK}/bld-${CHAN}/src/out/Default/${OUTFNAME} ${WORK}/
 
+echo "LAST_GOOD_TAG=${VER}" >> ${WORK}/PROPOSED.${CHAN}.sh
+
+# docker cp ${CN}:where-the-.deb-is .
 # we expect this file to be built by the docker container, and for it
 # to set DIFF_SHA256.
 cp ${WORK}/bld-${CHAN}/src/out/Default/DIFF_SHA.sh ${WORK}/DIFF_SHA.${CHAN}.sh
@@ -179,7 +182,7 @@ if [ "${AUTOUPDATE_LASTGOOD}" = "1" ]; then
   # SCPTARGET=who@where
   # SCPPREFIX=/var/www/whatever/
   # SCPURLBASE=https://where/whatever
-  . SCPTARGET.sh
+  . custom/SCPTARGET.sh
   scp ${WORK}/${OUTFNAME} ${SCPTARGET}:${SCPPREFIX}chromium-builds/${CHAN}/
   ssh ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" | \
     tail -n +${ROTATION} | sed -e "s@\(.*\)@${SCPPREFIX}chromium-builds/${CHAN}/\1@" | \

@@ -42,7 +42,7 @@ export PATH="${PATH}:${DIR}/depot_tools"
 # the purpose of this weird bash call when /bld is already present.)
 if [ -d ${DIR}/src ]; then
   cd ${DIR}/src
-  bash
+  bash -i
   exit
 fi
 
