@@ -9,6 +9,10 @@ fi
 WORK=nightly-junk
 mkdir -p ${WORK}
 LOGF=${WORK}/chrome-build-nightly.${CHAN}.log
+if [ -f ${LOGF} ]; then
+  # by default keep 3 weeks of logs (losing a few days while manually checking)
+  python -c "from logging.handlers import RotatingFileHandler as rf; rf('${LOGF}', backupCount=21).doRollover()"
+fi
 
 # from https://stackoverflow.com/a/22373735/3427357
 #exec > /tmp/out.log 2>&1
@@ -126,11 +130,15 @@ if [ "${LAST_GOOD_DIFF_SPEC}" != "" ]; then
     | sed -e "s@PATCH_LINE1@ENV PATCHSPEC=\"${LAST_GOOD_DIFF_SPEC}\"@" \
     | sed -e "s@PATCH_LINE2@@" \
     > ${WORK}/Dockerfile.${CHAN}
+  DIFFDESC="${LAST_GOOD_DIFF_SPEC}"
+  DIFFADVICE="Please push local commits to LAST_GOOD.${CHAN}.sh and CURRENT_BINARIES.${CHAN}.md"
 else
   cat Dockerfile.base \
     | sed -e "s@PATCH_LINE1@ENV PATCHFILE=\"/tmp/patch.diff\"@" \
     | sed -e "s@PATCH_LINE2@COPY ${LAST_GOOD_DIFF_FILE} /tmp/patch.diff@" \
     > ${WORK}/Dockerfile.${CHAN}
+  DIFFDESC="${LAST_GOOD_DIFF_FILE} (a local patch)"
+  DIFFADVICE="Please wrap up the patch generation process from https://github.com/GrumpyOldTroll/chromium_fork#building-a-patch with a diff between checked-in tags"
 fi
 #  | sed -e "s@PROPOSEDFILE@${WORK}/PROPOSED.${CHAN}.sh@" \
 #${DKR} build --file ${WORK}/Dockerfile.${CHAN}.latest --tag ${CI}:latest .
@@ -197,3 +205,6 @@ fi
 
 rm -rf $(readlink ${WORK}/bld-${CHAN})
 rm ${WORK}/bld-${CHAN}
+echo "SUCCESS($(date +"%Y-%m-%d %H:%M:%S")): build changed from ${LAST_GOOD_TAG} to ${VERSION} with diff=${DIFFDESC}"
+echo "${DIFFADVICE}"
+exit 2

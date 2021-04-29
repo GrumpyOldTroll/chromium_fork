@@ -4,61 +4,54 @@ set -e
 
 # You need a few files under custom/:
 # - CUSTOM.sh:
-#    TOMAIL=someone@example.com
-#    LOCATION=/home/someone/chromium_fork
+#    export TOMAIL=someone@example.com
+#    export LOCATION=/home/someone/chromium_fork
 # - SCPTARGET.sh:
 #    SCPTARGET=someone@backend-host.example.com
 #    SCPURLBASE=https://frontend-download-loc.example.com/somewhere
 #    SCPPREFIX=/var/www/somewhere/
-# - template-pass.txt
-# - template-fail.txt
+# - template-unchanged.txt (for if the upstream release tags didn't move)
+# - template-pass.txt (for if the build passed)
+# - template-fail.txt (for a build failure)
 
-. custom/CUSTOM.sh
-cd ${LOCATION}
+# 11 13 * * * /bin/bash -c '. /home/jholland/src/chromium_fork/custom/CUSTOM.sh ; cd ${LOCATION} ; ./chromium-build-cron.sh'
 
-export CHAN=dev
-if ./nightly.sh > nightly-junk/full-${CHAN}.txt 2>&1; then
-  DEVRESULT=1
-else
-  DEVRESULT=0
-fi
-
-export CHAN=stable
-if ./nightly.sh > nightly-junk/full-${CHAN}.txt 2>&1; then
-  STABLERESULT=1
-else
-  STABLERESULT=0
-fi
+#. custom/CUSTOM.sh
+#cd ${LOCATION}
 
 MSG=nightly-junk/msg.txt
-
-if [ "${DEVRESULT}" = "1" -a "${STABLERESULT}" = "1" ]; then
-  cp custom/template-pass.txt ${MSG}
-  mutt -s "PASS both chromium builds ($(date +'%Y-%m-%d %H:%M:%S'))" ${TOMAIL} < ${MSG}
-elif [ "${DEVRESULT}" = "0" -a "${STABLERESULT}" = "0" ]; then
-  cp custom/template-fail.txt ${MSG}
+echo "" > ${MSG}
+ATTENTION=0
+CHANNELS=0
+for rel in dev stable; do
+  export CHAN=${rel}
   echo "" >> ${MSG}
-  echo "---------------------------------------- dev -----------------------------------------------" >> ${MSG}
+  echo "---------------------------------------- ${CHAN} -----------------------------------------------" >> ${MSG}
   echo "" >> ${MSG}
-  echo "tail -n 200 nightly-junk/chrome-build-nightly.dev.log" >> ${MSG}
-  tail -n 200 nightly-junk/chrome-build-nightly.dev.log >> ${MSG}
-  echo "" >> ${MSG}
-  echo "----------------------- stable ---------------------------" >> ${MSG}
-  echo "" >> ${MSG}
-  echo "tail -n 200 nightly-junk/chrome-build-nightly.stable.log" >> ${MSG}
-  tail -n 200 nightly-junk/chrome-build-nightly.stable.log >> ${MSG}
-  mutt -s "FAIL chromium build (both) ($(date +'%Y-%m-%d %H:%M:%S'))" ${TOMAIL} < ${MSG}
-else
-  if [ "${DEVRESULT}" = "0" ]; then
-    WHICH=dev
+  CHANNELS=$((CHANNELS+1))
+  # if ./nightly.sh > nightly-junk/full-${CHAN}.txt 2>&1; then
+  ./nightly.sh > /dev/null 2>&1
+  RET=$?
+  if [ "${RET}" = "0" ]; then
+    cat custom/template-unchanged.txt >> ${MSG}
+    tail -n 200 nightly-junk/chrome-build-nightly.${CHAN}.log >> ${MSG}
+  elif [ "${RET}" = "2" ]; then
+    cat custom/template-pass.txt >> ${MSG}
+    # last 2 lines of a successful nightly.sh are geared to successful build
+    echo " ------ " >> ${MSG}
+    tail -n 5 nightly-junk/chrome-build-nightly.${CHAN}.log >> ${MSG}
+    ATTENTION=$((ATTENTION + 1))
   else
-    WHICH=stable
+    cat custom/template-fail.txt >> ${MSG}
+    echo " ------ " >> ${MSG}
+    tail -n 200 nightly-junk/chrome-build-nightly.${CHAN}.log >> ${MSG}
+    ATTENTION=$((ATTENTION + 1))
   fi
-  cp custom/template-fail.txt ${MSG}
-  echo "" >> ${MSG}
-  echo "------------------------ ${WHICH} -----------------------------" >> ${MSG}
-  echo "" >> ${MSG}
-  echo "tail -n 200 nightly-junk/chrome-build-nightly.${WHICH}.log" >> ${MSG}
-  tail -n 200 nightly-junk/chrome-build-nightly.${WHICH}.log >> ${MSG}
-  mutt -s "FAIL chromium build (${WHICH}) ($(date +'%Y-%m-%d %H:%M:%S'))" ${TOMAIL} < ${MSG}
+done
+
+if [ "${ATTENTION}" = "0" ]; then
+  mutt -s "Chromium unchanged ($(date +'%Y-%m-%d %H:%M:%S'))" ${TOMAIL} < ${MSG}
+else
+  mutt -s "Chromium: ${ATTENTION}/${CHANNELS} builds need attention ($(date +'%Y-%m-%d %H:%M:%S'))" ${TOMAIL} < ${MSG}
 fi
+
