@@ -2,11 +2,12 @@
 
 This repo is for maintaining a [fork of chromium](https://github.com/GrumpyOldTroll/chromium) that includes a [multicast API](/https://github.com/GrumpyOldTroll/wicg-multicast-receiver-api), and to regularly sync it from upstream.  The target is to stay up to date daily with the latest dev and stable builds, with a 1-week grace period when manual fixes are needed.
 
-There's a set of URLS of recent builds in <CURRENT_BINARIES.stable.md> and <CURRENT_BINARIES.dev.md> with the url of a .deb file.
+There's a set of URLS of recent builds in [CURRENT_BINARIES.stable.md](CURRENT_BINARIES.stable.md) and [CURRENT_BINARIES.dev.md](CURRENT_BINARIES.dev.md) with download links for .deb files.
 
 To download and run it against a page that can join multicast traffic and receive payloads in javascript, you can run it like this:
 
 ~~~
+VER=<pick recent value from LAST_GOOD.stable.sh or CURRENT_BINARIES>
 curl -O https://jholland-vids.edgesuite.net/chromium-builds/dev/chromium-browser-mc-unstable_${VER}-1_amd64.deb
 sudo dpkg --install chromium-browser-mc-unstable_${VER}-1_amd64.deb
 
@@ -116,7 +117,7 @@ However, unlike the patch failure, in this case there might be an intermediate b
 If you want to make local edits before beginning the rebase process to do quick checks about what it takes to fix compiling, it's strongly encouraged to capture the snapshot you're making the changes against by making a local commit to a local branch before doing anything:
 
 ~~~
-git switch -c experimental-fixing-branch
+git checkout -b experimental-fixing-branch
 git add -A .
 git commit -m "capturing the applied last good diff before trying to fix build errors"
 ~~~
@@ -156,7 +157,7 @@ But we still want to be able to produce a diff with a patch, so first we capture
 
 ~~~
 cd nightly-junk/bld-dev/src
-git switch -c experimental-fixing-branch
+git checkout -b experimental-fixing-branch
 git add -A .
 git commit -m "capturing the applied last good diff before trying to fix build errors"
 ~~~
@@ -327,9 +328,9 @@ $ ( [ "$(git merge-base multicast/multicast-base main)" = "$(git merge-base ${VE
 multicast-base ok to leave alone
 ~~~
 
-This means the multicast-base branch is pointing at a particular commit from the upstream main branch, with the multicast API changes on top of it.  However, the commit from the main branch is never the same as the release commit.  (At the very least, the 
+This means the multicast-base branch is pointing at a particular commit from the upstream main branch, with the multicast API changes on top of it.  However, the commit from the main branch is never the same as the release commit.  (At the very least, the DEPS and chrome/VERSION files will be different.)
 
-At this point we make a branch off multicast-base, which is at a sort of "point in main+multicast" state, and rebase it to the release tag, which has extra changes since it was forked from main. If you are not already on the multicas-base branch, make sure to `git checkout multicast-base` (or `git checkout --track multicast/multicast-base`, if you didn't do it during the prior step), then rebase to the release tag:
+At this point we make a branch off multicast-base, which is at a sort of "point in main+multicast" state, and rebase it to the release tag, which has extra changes since it was forked from main. If you are not already on the multicas-base branch, make sure to `git checkout multicast-base` (or `git checkout --track multicast/multicast-base`, if you didn't do it during the prior step), then make a local branch to rebase to the release tag inside it (the multicast-base branch SHOULD NOT be used for that rebase):
 
 ~~~
 $ git branch
@@ -342,11 +343,11 @@ First, rewinding head to replay your work on top of it...
 Applying: initial multicast API, base functionality
 ~~~
 
-If that rebase operation results in a merge conflict, usually it's best to make the fix in multicast-base branch (by doing a `git rebase --abort`, then a `git checkout multicast-base`, followed by edits and `git add` of the files that need fixing, and `git commit -m "fixed merge problems"`), and then do another git switch to a new temporary branch.
+If that rebase operation results in a merge conflict, usually it's best to make the fix in multicast-base branch (by doing a `git rebase --abort`, then a `git checkout multicast-base`, followed by edits and `git add` of the files that need fixing, and `git commit -m "fixed merge problems"`), and then do another git checkout -b to a new temporary branch.
 
 However, sometimes it might be better to instead produce a multicast-patch-\<version\> branch instead, when the change should not go into multicast-base for some reason.
 
-The basic heuristic here is to try putting the fix in multicast-base, but if that produces a failure like a merge conflict while rebasing to ${VERSION}, or a build failure whose fix causes a merge conflict when rebasing, roll back the change and make a patch branch instead with `git switch -c`.  There might be other times a patch branch is justified, but that's expected to cover the most common cases.
+The basic heuristic here is to try putting the fix in multicast-base, but if that produces a failure like a merge conflict while rebasing to ${VERSION}, or a build failure whose fix causes a merge conflict when rebasing, roll back the change and make a patch branch instead with `git checkout -b` (or git switch -c).  There might be other times a patch branch is justified, but that's expected to cover the most common cases.
 
 The important thing to remember is that multicast-base is just the multicast-related changes on top of a commit from the main branch.  Anything version-specific should be forked off to a version-specific branch, to the extent it can be determined.  But it can be a fuzzy line.
 
@@ -417,7 +418,7 @@ You're encouraged to test that the .deb behaves as it should before pushing the 
 
 Now there's some new tags and commits added to the local clone of the repo, so these need to be pushed to the multicast fork online repo.
 
-If you've done the "Testing With Local Patch File" steps, you'll hopefully have your changes sitting in something like `/tmp/bld-CURTEST/src`, otherwise maybe your changes will be inside `nightly-junk/bld-${CHAN}/src`, or possibbly one of the /tmp/chromium-build-xxxx directories if you didn't move it earlier.
+If you've done the "Testing With Local Patch File" steps, you'll hopefully have your changes sitting in something like `/tmp/bld-CURTEST/src`, otherwise maybe your changes will be inside `nightly-junk/bld-${CHAN}/src`, or possibly one of the /tmp/chromium-build-xxxx directories if you didn't move it earlier.
 
 Regardless, the point of this part is to get the changes that were needed checked in to the forked chromium branch, so that future builds can use them to produce the patch as a diff between 2 checked-in tags.
 
@@ -487,7 +488,7 @@ LAST_GOOD_BRANCH=$(git rev-list -n1 ${VERSION})
 EOF
 ~~~
 
-The cbuild-${CHAN} docker container doesn't get cleaned up if the nightly.sh script doesn't complete.  But more importantly, the temp file for the build also doesn't get cleaned up, and that will be using a lot of space.
+The cbuild-${CHAN} docker container doesn't get cleaned up if the nightly.sh script doesn't complete.  But more importantly, the temp directory for the build also doesn't get cleaned up, and that will be using a lot of space.
 
 ~~~
 docker container rm cbuild-${CHAN}
