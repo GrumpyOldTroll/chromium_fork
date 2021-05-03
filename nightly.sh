@@ -156,13 +156,18 @@ ln -s ${BLDDIR} ${WORK}/bld-${CHAN}
 # https://github.com/ogra1/snapd-docker/blob/master/build.sh, however it
 # seems to need a different entrypoint that's less convenient for my usage,
 # so I do it this way, which uses the host's snap socket. --jake 2021-03-20
-${DKR} run --name ${CN} -d \
+#
+# PS: we run with -i instead of -d so that we can get in interactively
+# afterwards if it goes wrong.  We do it in screen so it'll have an input
+# terminal.
+/usr/bin/screen -d -m /bin/bash -c "${DKR} run --name ${CN} -it \
 	--env VERSION=${VER} \
 	--env LASTGOOD=${LAST_GOOD_TAG} \
 	--env CHAN=${CHAN} \
   -v ${BLDDIR}:/bld \
-	-v /run/snapd.socket:/run/snapd.socket ${CI}:latest
+	-v /run/snapd.socket:/run/snapd.socket ${CI}:latest"
 
+sleep 2
 ${DKR} logs -f ${CN}
 
 #${DKR} cp ${CN}:/bld/src/out/Default/chromium-browser-mc-unstable_${VER}-1_amd64.deb ${WORK}/

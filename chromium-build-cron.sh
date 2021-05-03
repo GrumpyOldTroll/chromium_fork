@@ -1,6 +1,8 @@
 #!/bin/bash
 
-set -e
+# normally I like to set -e, but it's a pain to pull the return value
+# out of a failed nighty call, and I want an email sent either way.
+# set -e
 
 # You need a few files under custom/:
 # - CUSTOM.sh:

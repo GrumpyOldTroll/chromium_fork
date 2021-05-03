@@ -98,11 +98,11 @@ Recommended in both the host and the container is to `. out/Default/env.sh` to s
 In the most common case that needs intervention, there's an error from the git apply (usually it's from some other line that got added to the same place one of the multicast hookups added a line).
 
 In this case, the message from the end of the log file will say the git apply failed, and the git status will show a clean directory with no edits.
-Most likely you can move on to "Building a Patch".
+Most likely you can move on to "[Building a Patch](#building-a-patch)".
 
 You'll basically be rebasing a local dummy branch to produce a new tag that builds and runs successfully, starting from an earlier working tag.  If it's the dev branch, you'll often be rebasing the `multicast/multicast-base` branch as part of that.
 
-(If doing that produces a build or test failure, you'd gasically come back to the "Build Failure" section.)
+(If doing that produces a build or test failure, you'd basically come back to the "Build Failure" section.)
 
 ### Build Failure
 
@@ -250,6 +250,20 @@ needs rebasing
 
 For stable we instead work with a branch named "multicast-patch-X.Y.Z", where X, Y, and Z are the first 3 numbers from the chromium release branch, and when the new release of stable changes those first 3 numbers, we make a new branch.
 
+If it needs rebasing and has a different version branch, the commands you'll use for this stage look like this:
+
+~~~
+NEWBASE=$(git merge-base ${VERSION} main)
+git checkout --track multicast/multicast-base
+git rebase ${NEWBASE}
+# fix merge conflicts
+git rebase --continue
+BP=$(echo ${VERSION} | cut -f -3 -d.)
+git tag -a -m "Branch point for adding multicast to ${BP} releases." mcbp-${BP}
+~~~
+
+After that, you'll proceed to "Mapping onto a Release Tag".
+
 #### Example
 
 For example, here's what it looked like to rebase from 91.0.4449's branch to 91.0.4469's branch:
@@ -324,7 +338,7 @@ $ git tag -a -m "Branch point for adding multicast to ${BP} releases." mcbp-${BP
 After the above step (or if the above step was not necessary because the new version is in the same branch as the prior version) the `git merge-base main` for the multicast-base branch and the target VERSION tag.
 
 ~~~
-$ ( [ "$(git merge-base multicast/multicast-base main)" = "$(git merge-base ${VERSION} main)" ] && echo "multicast-base ok to leave alone" ) || echo "multicast-base still needs rebasing to 'git merge-base ${VERSION} main'"
+$ ( [ "$(git merge-base multicast-base main)" = "$(git merge-base ${VERSION} main)" ] && echo "multicast-base ok to leave alone" ) || echo "multicast-base still needs rebasing to 'git merge-base ${VERSION} main'"
 multicast-base ok to leave alone
 ~~~
 
@@ -381,7 +395,7 @@ git tag -a -m "Multicast API patched onto ${VERSION}" mc-${VERSION}
 The diff between the new tag and the release tag is the patch that we want to use as the patch for nightly.sh, so we dump that to a local file:
 
 ~~~
-$ FORKDIR=$(dirname $(dirname $(dirname $(dirname ${PWD}))))/chromium_fork
+$ FORKDIR=${HOME}/src/chromium_fork
 $ git diff ${VERSION}..mc-${VERSION} > ${FORKDIR}/patches/from-${VERSION}-patch.diff
 ~~~
 
@@ -413,6 +427,63 @@ tail -f screenlog.0
 If that completes successfully, it'll end up with a new .deb file in `nightly-junk/chromium-browser-mc-unstable_${VERSION}-1_amd64.deb`.  It'll take something like 8 hours or so, probably.
 
 You're encouraged to test that the .deb behaves as it should before pushing the updates with new references.  TBD: explain how  and make better tests (probably not quite enough to just link to [multicast-ingest-platform](https://github.com/GrumpyOldTroll/multicast-ingest-platform) and a [demo page](https://htmlpreview.github.io/?https://github.com/GrumpyOldTroll/wicg-multicast-receiver-api/blob/master/demo-multicast-receive-api.html) for manual testing...)
+
+### Fixing and Repeating
+
+Sometimes the local patch file fails.  When this happens, you'll want to make the appropriate changes and retry.
+
+This is almost like going back to the start of "Building a Patch" with a new failure, but because you've made tags at this point you'll have to remove them, and you'll want to put the changes you need into the right location, which is likely not where you are in the bld-CURTEST directory being used to build the patch, and maybe you've logged out while the build was running and need to reset the variables:
+
+At this point, very likely you're in the "build failure" scenario, so it's helpful to check the proposed changes inside the in-progress build environment.  You want to capture a good starting point to diff against in another temp branch that won't be checked in from inside the new build with the patch that doesn't build:
+
+~~~
+$ cd src/chromium_fork
+$ cd nightly-build/bld-dev/src
+$ git checkout -b experimental-2
+$ git add -A .
+$ git commit -m "re-trying fix for build errors"
+~~~
+
+Then you can re-check the build before editing:
+
+~~~
+$ docker start -i cbuild-dev
+$ cd /bld/src
+$ autoninja -C out/Default chrome
+~~~
+
+Make the fixes you'll need, these 2 locations are hopefully pointing at the same location via a bind-mount.
+
+You'll need to delete the prior tags, apply the patch, and make the new tags:
+
+~~~
+$ cd /tmp/bld-CURTEST/src
+$ . out/Default/env.sh
+$ BP=$(echo ${VERSION} | cut -f -3 -d.)
+$ git tag --delete mcbp-${BP}
+$ git tag --delete mc-${VERSION}
+~~~
+
+(Then either "git diff > patch.txt" in chromium_fork/nightly-junk/bld-dev/src and "git apply" that file to your multicast-base in /tmp/bld-CURTEST/src, or otherwise apply the changes as you like.)
+
+Then in the staging area, generate another patch and retry the nightly.sh run:
+
+~~~
+$ cd /tmp/bld-CURTEST/src
+$ . out/Default/env.sh
+$ BP=$(echo ${VERSION} | cut -f -3 -d.)
+$ git checkout multicast-base
+$ git apply patch.txt
+$ git commit -m "extra fixes after rebase to ${VERSION}"
+$ git tag -a -m "Branch point for adding multicast to ${BP} releases." mcbp-${BP}
+$ git checkout -b patch-try3
+$ git rebase ${VERSION}
+$ git tag -a -m "Multicast API patched onto ${VERSION}" mc-${VERSION}
+$ FORKDIR=${HOME}/src/chromium_fork
+$ git diff ${VERSION}..mc-${VERSION} > ${FORKDIR}/patches/from-${VERSION}-patch.diff
+$ docker container rm cbuild-${CHAN}
+$ screen -d -L -m /bin/bash -c "CHAN=${CHAN} USE_PATCH=patches/from-${VERSION}-patch.diff VER=${VERSION} ./nightly.sh"
+~~~
 
 ## Pushing the Updated Patch
 
@@ -469,6 +540,8 @@ The automated nightly build should generate the patch diff from commits checked 
 If you had to do a manual fix, the build state is currently broken, and you can put it back into a self-sustaining mode by giving the build server a LAST_GOOD.${CHAN}.sh file that will make it rebuild:
 
 ~~~
+FORKDIR=${HOME}/src/chromium_fork
+cd ${FORKDIR}
 cat > LAST_GOOD.${CHAN}.sh <<EOF
 LAST_GOOD_DIFF_SPEC="${VERSION}..mc-${VERSION}"
 LAST_GOOD_DIFF_SHA256=
