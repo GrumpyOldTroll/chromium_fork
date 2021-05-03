@@ -196,11 +196,11 @@ if [ "${AUTOUPDATE_LASTGOOD}" = "1" ]; then
   # SCPPREFIX=/var/www/whatever/
   # SCPURLBASE=https://where/whatever
   . custom/SCPTARGET.sh
-  scp ${WORK}/${OUTFNAME} ${SCPTARGET}:${SCPPREFIX}chromium-builds/${CHAN}/
-  ssh ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" | \
+  scp ${SSHKEY} ${WORK}/${OUTFNAME} ${SCPTARGET}:${SCPPREFIX}chromium-builds/${CHAN}/
+  ssh ${SSHKEY} ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" | \
     tail -n +${ROTATION} | sed -e "s@\(.*\)@${SCPPREFIX}chromium-builds/${CHAN}/\1@" | \
     xargs -r ssh ${SCPTARGET} rm
-  ssh ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" |
+  ssh ${SSHKEY} ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" |
     sed -e "s@\(.*\)@ * ${SCPURLBASE}/chromium-builds/${CHAN}/\1@" > \
     CURRENT_BINARIES.${CHAN}.md
   mv ${WORK}/PROPOSED.${CHAN}.sh LAST_GOOD.${CHAN}.sh
