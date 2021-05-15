@@ -91,6 +91,12 @@ Either way, there's a env.sh file stuck into `out/Default/env.sh` with some help
 
 Recommended in both the host and the container is to `. out/Default/env.sh` to set these variables in your shell while working, the rest of the commands will use these variables assuming they've been set.
 
+For doing the rebase you will want to set [rerere](https://git-scm.com/book/en/v2/Git-Tools-Rerere), as we are in one of the relevant use cases (a long-lived rebase), and it's super-annoying and error-prone to re-fix the exact same changes over and over:
+
+~~~
+git config --global rerere.enabled true
+~~~
+
 ## Failure Modes
 
 ### Patch Application Failure

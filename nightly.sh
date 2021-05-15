@@ -21,28 +21,37 @@ CN=cbuild-${CHAN}
 CI=${CN}
 DKR=docker
 
-PREV_RUNNING=$(${DKR} container inspect ${CN} 2> /dev/null) | jq -r ".[].State.Running"
-if [ "${PREV_RUNNING}" = "true" ]; then
-    echo "$(date) docker container ${CN} already running" | tee -a ${LOGF}
-    exit 1
-fi
-
 CLEANED_REPORT=""
-if [ "${PREV_RUNNING}" = "false" ]; then
-    # 1-week grace period on cleaning a prior build failure
-    GRACE=$((7 * 86400))
-    echo "$(date) docker container ${CN} exists and is stopped" | tee -a ${LOGF}
-    PREV_CREATED=$(${DKR} container inspect ${CN} | jq -r ".[].Created")
-    OLD=$(date +'%s' -d "${PREV_CREATED}")
-    NOW=$(date +'%s')
-    SINCE=$(python -c "print(${NOW}-${OLD})")
-    if [ "${SINCE}" -lt "${GRACE}" ]; then
-	echo "$(date) exiting nightly build (build from ${PREV_CREATED} inside 1-week grace period on existing container" | tee -a ${LOGF}
-	exit 1
-    fi
-    echo "old enough to proceed by cleaning up (${SINCE}s > ${GRACE}s), cleaning" | tee -a ${LOGF}
-    CLEANED_REPORT="cleaned old container from ${PREV_CREATED}"
-    ${DKR} container rm ${CN}
+if ${DKR} container inspect ${CN} 2> /dev/null 1> /dev/null ; then
+  PREV_RUNNING=$(${DKR} container inspect ${CN} 2> /dev/null | jq -r ".[].State.Running")
+  if [ "${PREV_RUNNING}" != "true" -a "${PREV_RUNNING}" != "false" ]; then
+      echo "$(date) error: docker container ${CN} could not determine prior running state" | tee -a ${LOGF}
+      exit 1
+  fi
+
+  if [ "${PREV_RUNNING}" = "true" ]; then
+      echo "$(date) docker container ${CN} already running" | tee -a ${LOGF}
+      exit 1
+  fi
+
+  if [ "${PREV_RUNNING}" = "false" ]; then
+      # 1-week grace period on cleaning a prior build failure
+      GRACE=$((7 * 86400))
+      echo "$(date) docker container ${CN} exists and is stopped" | tee -a ${LOGF}
+      PREV_CREATED=$(${DKR} container inspect ${CN} | jq -r ".[].Created")
+      OLD=$(date +'%s' -d "${PREV_CREATED}")
+      NOW=$(date +'%s')
+      SINCE=$(python -c "print(${NOW}-${OLD})")
+      if [ "${SINCE}" -lt "${GRACE}" ]; then
+        echo "$(date) exiting nightly build (build from ${PREV_CREATED} inside 1-week grace period on existing container" | tee -a ${LOGF}
+        exit 1
+      fi
+      echo "old enough to proceed by cleaning up (${SINCE}s > ${GRACE}s), cleaning" | tee -a ${LOGF}
+      CLEANED_REPORT="cleaned old container from ${PREV_CREATED}"
+      ${DKR} container rm ${CN}
+  fi
+else
+  echo "$(date) docker container ${CN} not present, proceeding" | tee -a ${LOGF}
 fi
 
 if [ "${VER}" = "" ]; then
@@ -198,10 +207,11 @@ if [ "${AUTOUPDATE_LASTGOOD}" = "1" ]; then
   . custom/SCPTARGET.sh
   scp ${SSHKEY} ${WORK}/${OUTFNAME} ${SCPTARGET}:${SCPPREFIX}chromium-builds/${CHAN}/
   ssh ${SSHKEY} ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" | \
-    tail -n +${ROTATION} | sed -e "s@\(.*\)@${SCPPREFIX}chromium-builds/${CHAN}/\1@" | \
+    tail -n +$((${ROTATION}+4)) | sed -e "s@\(.*\)@${SCPPREFIX}chromium-builds/${CHAN}/\1@" | \
     xargs -r ssh ${SCPTARGET} rm
-  ssh ${SSHKEY} ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" |
-    sed -e "s@\(.*\)@ * ${SCPURLBASE}/chromium-builds/${CHAN}/\1@" > \
+  ssh ${SSHKEY} ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" | \
+    sed -e "s@\(.*\)@ * ${SCPURLBASE}/chromium-builds/${CHAN}/\1@" | \
+    head -n ${ROTATION} > \
     CURRENT_BINARIES.${CHAN}.md
   mv ${WORK}/PROPOSED.${CHAN}.sh LAST_GOOD.${CHAN}.sh
   git add LAST_GOOD.${CHAN}.sh CURRENT_BINARIES.${CHAN}.md
