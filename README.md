@@ -26,9 +26,9 @@ Whenever that fails, or whenever there's new edits to the multicast API feature,
 
 ## Branches:
 
- * [multicast-base](https://github.com/GrumpyOldTroll/chromium/tree/multicast-base) is where the baseline multicast implementation is to be developed.  This should remain a branch with a usable history about the multicast-API-related changes, uncorrupted by a lot of version and merge-related junk (though there will likely be several hopefully-minor ones where changes are needed to stay integrated with the upstream).  This branch starts from a specific commit off main, and it rebases to new main commits that are the [merge base](https://git-scm.com/docs/git-merge-base) commits for new release branches from the upstream.  Feature work should generally branch from here, do the dev work, rebase from this branch (in case it moved), and then merge the change into this branch, then make sure the last good url points to commits that incorporate these changes. (That may require making a tag based on a rebase of this branch up to the current last known good version before these changes were applied.)
-   * This branch should specifically avoid pulling any of the version-specific changes to DEPS or chrome/VERSION in upstream release branches (to the point that we might break history to reverse this if it happens by accident, as it seems to make rebasing very painful). In general, this is done by being careful to rebase only to commits from upstream-main, not any of the commits from further down the version branches.
- * multicast-patch-\<version\> gets created for version branches when they have merge conflicts or build or runtime errors that need fixing on top of multicast-base in order to rebase to a release tag's commit.  Usually these fixes can be done in multicast-base instead, but sometimes they might need a branch.  These are also created for the stable branch even if there are no fixes needed because the stable release gets thousands of updates such that a rebase of a branch containing the multicast changes from the point where it branched from main to the release tag can take minutes to apply.
+ * [multicast-base](https://github.com/GrumpyOldTroll/chromium/tree/multicast-base) is where the baseline multicast implementation is to be developed.  This branch always merges to the [merge base](https://git-scm.com/docs/git-merge-base) commits for new release branches from the upstream.  Feature work should generally branch from here, do the dev work, rebase from this branch (in case it moved), and then merge the change into this branch, then make sure the last good url points to commits that incorporate these changes.
+   * This branch should specifically avoid pulling any of the version-specific changes to DEPS or chrome/VERSION in upstream release branches (to the point that we might break history to reverse this if it happens by accident, as it seems to make rebasing very painful). In general, this is done by being careful to merge only to commits from upstream-main, not any of the commits from further down the version branches.
+ * multicast-patch-\<version-base\> gets created for version branches when they have merge conflicts or build or runtime errors that need fixing on top of multicast-base in order to rebase to a release tag's commit.  Usually these fixes can be done in multicast-base instead, but sometimes they might need a branch.  These are also created for the stable branch even if there are no fixes needed because the stable release gets thousands of updates such that a rebase of a branch containing the multicast changes from the point where it branched from main to the release tag can take minutes to apply.
  * [upstream-main](https://github.com/GrumpyOldTroll/chromium/tree/upstream-main) exactly tracks the [upstream main](https://chromium.googlesource.com/chromium/src/+/refs/heads/main) branch, lagging behind by hopefully-less-than-a-week.  It should never contain anything different than the upstream main.  If it accidentally diverges for some reason, we'll break history on this branch to put it back in sync.
 
 We don't keep a branch for tracking dev releases like we do for stable because the rebranching off main for a new dev release happens too often.  However, branching off multicast-base and rebasing to the latest dev tag from upstream is generally equivalent to what that branch would be, for the latest dev build.
@@ -39,7 +39,7 @@ We use tags to help track the commit chains for builds we made that included the
 
 If we had a successful build, there should be 2 tags, one of which is shared across multiple updates for a major release branch.
 
- - mcbp-\<version-base\>, e.g. mcbp-89.0.4389 (note: only the first 3 numbers, not the 4 of the full version tag from chromium).  This was the commit that resulted from rebasing multicast-base to the merge-base commit that's common to the version branch and main (as reported by git merge-base).  "bp" in the name stands for "branch point".
+ - mcbp-\<version-base\>, e.g. mcbp-89.0.4389 (note: only the first 3 numbers, not the 4 of the full version tag from chromium).  This was the commit that resulted from moving multicast-base to the merge-base commit that's common to the version branch and main (as reported by git merge-base).  "bp" in the name stands for "branch point".
  - mc-\<version\>: e.g. mc-89.0.4389.82.  This commit results from rebasing a branch starting from the corresponding mcbp-\<version-base\> tag to the commit at the release version tag.
 
 # Manual Changes to Fix Issues
@@ -91,7 +91,7 @@ Either way, there's a env.sh file stuck into `out/Default/env.sh` with some help
 
 Recommended in both the host and the container is to `. out/Default/env.sh` to set these variables in your shell while working, the rest of the commands will use these variables assuming they've been set.
 
-For doing the rebase you will want to set [rerere](https://git-scm.com/book/en/v2/Git-Tools-Rerere), as we are in one of the relevant use cases (a long-lived rebase), and it's super-annoying and error-prone to re-fix the exact same changes over and over:
+For doing rebases you may want to set [rerere](https://git-scm.com/book/en/v2/Git-Tools-Rerere):
 
 ~~~
 git config --global rerere.enabled true
@@ -212,20 +212,20 @@ Whether an apply failed or the build failed, you'll need to know what's the patc
 
 From the host, these are in nightly-junk/bld-${CHAN}/src/out/Default/env.sh`.
 
-Load the values:
+The place to work is in the src directory usually:
 
 ~~~
-. nightly-junk/bld-dev/src/out/Default/env.sh
-# or: . nightly-junk/bld-stable/src/out/Default/env.sh
+cd nightly-junk/bld-dev/src
+# or cd nightly-junk/bld-stable/src
 ~~~
 
-This should set VERSION, LASTGOOD, and CHAN, which you can use to copy/paste most of the commands.
-
-Then you can go into the source directory:
+Then load the values:
 
 ~~~
-cd nightly-junk/bld-${CHAN}/src
+. out/Default/env.sh
 ~~~
+
+This should set VERSION, LASTGOOD, CHAN, and BP, which you can use to copy/paste most of the commands.
 
 ### Moving to a Newer Merge Base
 
@@ -236,8 +236,8 @@ If VERSION is on a different release branch than LASTGOOD, you'll need to use a 
 Sometimes you can skip this step, for instance when the old build was for 91.0.4449.4, and you get a new compile error when trying 91.0.4449.6.
 
 ~~~
-$ ( [ "$(git merge-base ${LASTGOOD} main)" = "$(git merge-base ${VERSION} main)" ] && echo "ok to leave alone" ) || echo "needs rebasing"
-needs rebasing
+$ ( [ "$(git merge-base ${LASTGOOD} main)" = "$(git merge-base ${VERSION} main)" ] && echo "ok to leave alone" ) || echo "needs to move merge base"
+needs to move merge base
 ~~~
 
 This generally is associated with a change in the first 3 numbers of the version (though this is not enforced by git and should probably not be strictly relied upon, it's just a chromium branch design choice that could theoretically change, and I don't know how strictly enforced it is):
@@ -250,27 +250,41 @@ different version branch
 For dev, (where this changes frequently) we'll move the multicast/multicast-base branch to the merge-base of the latest dev release branch.  It's expected that if LASTGOOD's merge-base is different than VERSION's, so is multicast/multicast-base
 
 ~~~
-$ ( [ "$(git merge-base multicast/multicast-base main)" = "$(git merge-base ${VERSION} main)" ] && echo "ok to leave alone" ) || echo "needs rebasing"
-needs rebasing
+$ ( [ "$(git merge-base multicast/multicast-base main)" = "$(git merge-base ${VERSION} main)" ] && echo "ok to leave alone" ) || echo "needs version base move"
+needs version base move
 ~~~
 
 For stable we instead work with a branch named "multicast-patch-X.Y.Z", where X, Y, and Z are the first 3 numbers from the chromium release branch, and when the new release of stable changes those first 3 numbers, we make a new branch.
 
-If it needs rebasing and has a different version branch, the commands you'll use for this stage look like this:
+If it needs moving and has a different version branch, the commands you'll use for this stage look like this:
 
 ~~~
 NEWBASE=$(git merge-base ${VERSION} main)
 git checkout --track multicast/multicast-base
-git rebase ${NEWBASE}
+git merge ${NEWBASE}
 # fix merge conflicts
-git rebase --continue
-BP=$(echo ${VERSION} | cut -f -3 -d.)
+git commit -m "Merged to branch point for ${BP} releases"
+git tag -a -m "Branch point for adding multicast to ${BP} releases." mcbp-${BP}
+~~~
+
+For an update to stable, it's slightly different:
+
+~~~
+NEWBASE=$(git merge-base ${VERSION} main)
+OLDBP=$(echo ${LASTGOOD} | cut -f -3 -d.)
+git checkout ${NEWBASE}
+git checkout -b multicast-patch-${BP}
+git merge -m "Merge multicast from mcbp-${OLDBP} on top of new stable multicast branch for ${BP}"  mcbp-${OLDBP}
+# fix merge conflicts
+# git commit -m "Merge multicast from mcbp-${OLDBP} on top of new stable multicast branch for ${BP}"
 git tag -a -m "Branch point for adding multicast to ${BP} releases." mcbp-${BP}
 ~~~
 
 After that, you'll proceed to "Mapping onto a Release Tag".
 
 #### Example
+
+(NB: this example was from an earlier process that tried to use rebase instead of merge for multicast-base maintenance. But the fixes are similar, so I'll leave it for posterity.)
 
 For example, here's what it looked like to rebase from 91.0.4449's branch to 91.0.4469's branch:
 
@@ -344,7 +358,7 @@ $ git tag -a -m "Branch point for adding multicast to ${BP} releases." mcbp-${BP
 After the above step (or if the above step was not necessary because the new version is in the same branch as the prior version) the `git merge-base main` for the multicast-base branch and the target VERSION tag.
 
 ~~~
-$ ( [ "$(git merge-base multicast-base main)" = "$(git merge-base ${VERSION} main)" ] && echo "multicast-base ok to leave alone" ) || echo "multicast-base still needs rebasing to 'git merge-base ${VERSION} main'"
+$ ( [ "$(git merge-base multicast-base main)" = "$(git merge-base ${VERSION} main)" ] && echo "multicast-base ok to leave alone" ) || echo "multicast-base still needs moving to 'git merge-base ${VERSION} main'"
 multicast-base ok to leave alone
 ~~~
 
@@ -358,12 +372,10 @@ $ git branch
 * multicast-base
 $ git checkout -b temp-patch-branch
 Switched to a new branch 'temp-patch-branch'
-$ git rebase ${VERSION}
-First, rewinding head to replay your work on top of it...
-Applying: initial multicast API, base functionality
+$ git merge -m "Merge ${VERSION} on top of mcbp-${BP}" ${VERSION}
 ~~~
 
-If that rebase operation results in a merge conflict, usually it's best to make the fix in multicast-base branch (by doing a `git rebase --abort`, then a `git checkout multicast-base`, followed by edits and `git add` of the files that need fixing, and `git commit -m "fixed merge problems"`), and then do another git checkout -b to a new temporary branch.
+If that results in a merge conflict, usually it's best to make the fix in multicast-base branch (by doing a `git stash`, then a `git checkout multicast-base`, followed by edits and `git add` of the files that need fixing, and `git commit -m "fixed merge problems"`), and then do another git checkout -b to a new temporary branch.
 
 However, sometimes it might be better to instead produce a multicast-patch-\<version\> branch instead, when the change should not go into multicast-base for some reason.
 
@@ -380,7 +392,7 @@ Most of the time this looks like:
 ~~~
 git checkout multicast-base
 git checkout -b dummy-patch
-git rebase ${VERSION}
+git merge ${VERSION}
 ~~~
 
 It's useful here to try building (and ideally tests), by entering the docker container and running the build:
@@ -398,11 +410,11 @@ git tag -a -m "Multicast API patched onto ${VERSION}" mc-${VERSION}
 
 ### Testing With Local Patch File
 
-The diff between the new tag and the release tag is the patch that we want to use as the patch for nightly.sh, so we dump that to a local file:
+The diff between the new tag and the release tag is the patch that we want to use as the patch for nightly.sh, so we dump that to a local file (FD for FORKDIR):
 
 ~~~
-$ FORKDIR=${HOME}/src/chromium_fork
-$ git diff ${VERSION}..mc-${VERSION} > ${FORKDIR}/patches/from-${VERSION}-patch.diff
+$ FD=${HOME}/src/chromium_fork
+$ git diff ${VERSION}..mc-${VERSION} > ${FD}/patches/from-${VERSION}-patch.diff
 ~~~
 
 At this point we want to run the nightly build manually and ensure that it passes with this diff file against this target.
@@ -421,13 +433,14 @@ Remember if you're logged in remotely to do it from a tmux or screen, or somethi
 
 ~~~
 docker container rm cbuild-${CHAN}
-screen -d -L -m /bin/bash -c "CHAN=${CHAN} USE_PATCH=patches/from-${VERSION}-patch.diff VER=${VERSION} ./nightly.sh"
+rm -f screen.${CHAN}.log
+screen -d -L -Logfile screen.${CHAN}.log -m /bin/bash -c "CHAN=${CHAN} USE_PATCH=patches/from-${VERSION}-patch.diff VER=${VERSION} ./nightly.sh"
 ~~~
 
 If you want to watch it to make sure, you can:
 
 ~~~
-tail -f screenlog.0
+tail -f screen.${CHAN}.log
 ~~~
 
 If that completes successfully, it'll end up with a new .deb file in `nightly-junk/chromium-browser-mc-unstable_${VERSION}-1_amd64.deb`.  It'll take something like 8 hours or so, probably.
@@ -485,8 +498,8 @@ $ git tag -a -m "Branch point for adding multicast to ${BP} releases." mcbp-${BP
 $ git checkout -b patch-try3
 $ git rebase ${VERSION}
 $ git tag -a -m "Multicast API patched onto ${VERSION}" mc-${VERSION}
-$ FORKDIR=${HOME}/src/chromium_fork
-$ git diff ${VERSION}..mc-${VERSION} > ${FORKDIR}/patches/from-${VERSION}-patch.diff
+$ FD=${HOME}/src/chromium_fork
+$ git diff ${VERSION}..mc-${VERSION} > ${FD}/patches/from-${VERSION}-patch.diff
 $ docker container rm cbuild-${CHAN}
 $ screen -d -L -m /bin/bash -c "CHAN=${CHAN} USE_PATCH=patches/from-${VERSION}-patch.diff VER=${VERSION} ./nightly.sh"
 ~~~
@@ -546,8 +559,8 @@ The automated nightly build should generate the patch diff from commits checked 
 If you had to do a manual fix, the build state is currently broken, and you can put it back into a self-sustaining mode by giving the build server a LAST_GOOD.${CHAN}.sh file that will make it rebuild:
 
 ~~~
-FORKDIR=${HOME}/src/chromium_fork
-cd ${FORKDIR}
+FD=${HOME}/src/chromium_fork
+cd ${FD}
 cat > LAST_GOOD.${CHAN}.sh <<EOF
 LAST_GOOD_DIFF_SPEC="${VERSION}..mc-${VERSION}"
 LAST_GOOD_DIFF_SHA256=

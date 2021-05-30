@@ -197,24 +197,10 @@ ${DKR} image prune -f
 ${DKR} rm ${CN}
 
 if [ "${AUTOUPDATE_LASTGOOD}" = "1" ]; then
-  ROTATION=10
-  # SCPTARGET (not checked in) has the login info, file system location
-  # prefix, and associated url prefix for uploading to origin and
-  # downloading via https, and it likely looks something like this:
-  # SCPTARGET=who@where
-  # SCPPREFIX=/var/www/whatever/
-  # SCPURLBASE=https://where/whatever
-  . custom/SCPTARGET.sh
-  scp ${SSHKEY} ${WORK}/${OUTFNAME} ${SCPTARGET}:${SCPPREFIX}chromium-builds/${CHAN}/
-  ssh ${SSHKEY} ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" | \
-    tail -n +$((${ROTATION}+4)) | sed -e "s@\(.*\)@${SCPPREFIX}chromium-builds/${CHAN}/\1@" | \
-    xargs -r ssh ${SCPTARGET} rm
-  ssh ${SSHKEY} ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" | \
-    sed -e "s@\(.*\)@ * ${SCPURLBASE}/chromium-builds/${CHAN}/\1@" | \
-    head -n ${ROTATION} > \
-    CURRENT_BINARIES.${CHAN}.md
+  DEB=${WORK}/${OUTFNAME} CHAN=${CHAN} ./rotate.sh
+
   mv ${WORK}/PROPOSED.${CHAN}.sh LAST_GOOD.${CHAN}.sh
-  git add LAST_GOOD.${CHAN}.sh CURRENT_BINARIES.${CHAN}.md
+  git add LAST_GOOD.${CHAN}.sh
   git commit -m "auto-updated ${CHAN} at ${STARTTIME} (LAST_GOOD from ${LAST_GOOD_TAG} to ${VER})"
 fi
 

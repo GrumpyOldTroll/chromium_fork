@@ -87,6 +87,7 @@ cat > /tmp/env.sh <<EOF
 VERSION=${VERSION}
 LASTGOOD=${LASTGOOD}
 CHAN=${CHAN}
+BP=$(echo ${VERSION} | cut -f -3 -d.)
 EOF
 
 set -x
