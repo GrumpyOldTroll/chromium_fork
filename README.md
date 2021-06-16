@@ -501,7 +501,7 @@ $ git tag -a -m "Multicast API patched onto ${VERSION}" mc-${VERSION}
 $ FD=${HOME}/src/chromium_fork
 $ git diff ${VERSION}..mc-${VERSION} > ${FD}/patches/from-${VERSION}-patch.diff
 $ docker container rm cbuild-${CHAN}
-$ screen -d -L -m /bin/bash -c "CHAN=${CHAN} USE_PATCH=patches/from-${VERSION}-patch.diff VER=${VERSION} ./nightly.sh"
+$ screen -d -L -Logfile screen.${CHAN}.log -m /bin/bash -c "CHAN=${CHAN} USE_PATCH=patches/from-${VERSION}-patch.diff VER=${VERSION} ./nightly.sh"
 ~~~
 
 ## Pushing the Updated Patch
