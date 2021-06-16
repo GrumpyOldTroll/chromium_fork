@@ -198,6 +198,8 @@ ${DKR} rm ${CN}
 
 if [ "${AUTOUPDATE_LASTGOOD}" = "1" ]; then
   DEB=${WORK}/${OUTFNAME} CHAN=${CHAN} ./rotate.sh
+  echo "export CHAN=${CHAN}" > ${WORK}/rot-${CHAN}.sh
+  echo "export DEB=${WORK}/${OUTFNAME}" >> ${WORK}/rot-${CHAN}.sh
 
   mv ${WORK}/PROPOSED.${CHAN}.sh LAST_GOOD.${CHAN}.sh
   git add LAST_GOOD.${CHAN}.sh
@@ -206,6 +208,6 @@ fi
 
 rm -rf $(readlink ${WORK}/bld-${CHAN})
 rm ${WORK}/bld-${CHAN}
-echo "SUCCESS($(date +"%Y-%m-%d %H:%M:%S")): build changed from ${LAST_GOOD_TAG} to ${VERSION} with diff=${DIFFDESC}"
+echo "SUCCESS($(date +"%Y-%m-%d %H:%M:%S")): build changed from ${LAST_GOOD_TAG} to ${VER} with diff=${DIFFDESC}"
 echo "${DIFFADVICE}"
 exit 2

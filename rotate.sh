@@ -21,17 +21,17 @@ ROTATION=10
 # SCPPREFIX=/var/www/whatever/
 # SCPURLBASE=https://where/whatever
 . custom/SCPTARGET.sh
-scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${SSHKEY} ${DEB} ${SCPTARGET}:${SCPPREFIX}chromium-builds/${CHAN}/
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${SSHKEY} ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" | \
-  tail -n +$((${ROTATION}+4)) | sed -e "s@\(.*\)@${SCPPREFIX}chromium-builds/${CHAN}/\1@" | \
-  xargs -r ssh ${SCPTARGET} rm
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${SSHKEY} ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" | \
-  sed -e "s@\(.*\)@ * ${SCPURLBASE}/chromium-builds/${CHAN}/\1@" | \
-  head -n ${ROTATION} > CURRENT_BINARIES.${CHAN}.md
+/usr/bin/scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${SSHKEY} ${DEB} ${SCPTARGET}:${SCPPREFIX}chromium-builds/${CHAN}/
+/usr/bin/ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${SSHKEY} ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" | \
+  /usr/bin/tail -n +$((${ROTATION}+4)) | /bin/sed -e "s@\(.*\)@${SCPPREFIX}chromium-builds/${CHAN}/\1@" | \
+  /usr/bin/xargs -r ssh ${SCPTARGET} rm
+/usr/bin/ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${SSHKEY} ${SCPTARGET} "ls -t ${SCPPREFIX}chromium-builds/${CHAN}/" | \
+  /bin/sed -e "s@\(.*\)@ * ${SCPURLBASE}/chromium-builds/${CHAN}/\1@" | \
+  /usr/bin/head -n ${ROTATION} > CURRENT_BINARIES.${CHAN}.md
 
 # sometimes on a bad ssh the CURRENT_BINARIES winds up empty, don't commit those.
 BINCHECK=$(wc -l CURRENT_BINARIES.${CHAN}.md | awk '{print $1;}')
 if [ "${BINCHECK}" != "0" ]; then
-  git add CURRENT_BINARIES.${CHAN}.md
+  /usr/bin/git add CURRENT_BINARIES.${CHAN}.md
 fi
 
