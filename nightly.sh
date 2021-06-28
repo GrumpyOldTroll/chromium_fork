@@ -11,7 +11,7 @@ mkdir -p ${WORK}
 LOGF=${WORK}/chrome-build-nightly.${CHAN}.log
 if [ -f ${LOGF} ]; then
   # by default keep 3 weeks of logs (losing a few days while manually checking)
-  python -c "from logging.handlers import RotatingFileHandler as rf; rf('${LOGF}', backupCount=21).doRollover()"
+  python -c "from logging.handlers import RotatingFileHandler as rf; rf('${LOGF}', backupCount=12).doRollover()"
 fi
 
 # from https://stackoverflow.com/a/22373735/3427357
@@ -20,6 +20,23 @@ fi
 CN=cbuild-${CHAN}
 CI=${CN}
 DKR=docker
+
+STOP=0
+if ! ${DKR} container ls 2> /dev/null 1> /dev/null ; then
+  echo "$(date) error: '${DKR} container ls' failed, check docker install (USER=${USER})" | tee -a ${LOGF}
+  STOP=1
+fi
+if ! which jq 2> /dev/null 1> /dev/null ; then
+  echo "$(date) error: 'which jq' had no jq installed" | tee -a ${LOGF}
+  STOP=1
+fi
+if ! which snap 2> /dev/null 1> /dev/null ; then
+  echo "$(date) error: 'which snap' had no snapd installed" | tee -a ${LOGF}
+  STOP=1
+fi
+if [ "${STOP}" != "0" ]; then
+  exit 1
+fi
 
 CLEANED_REPORT=""
 if ${DKR} container inspect ${CN} 2> /dev/null 1> /dev/null ; then
