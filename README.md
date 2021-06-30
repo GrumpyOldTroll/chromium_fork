@@ -261,6 +261,10 @@ If it needs moving and has a different version branch, the commands you'll use f
 ~~~
 NEWBASE=$(git merge-base ${VERSION} main)
 git checkout --track multicast/multicast-base
+cp out/Default/env.sh ..
+# otherwise that can get annoyingly lost cleaning leftover junk:
+git clean -ffdx
+cp ../env.sh out/Default/env.sh
 git merge ${NEWBASE}
 # fix merge conflicts
 git commit -m "Merged to branch point for ${BP} releases"

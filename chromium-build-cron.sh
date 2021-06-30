@@ -16,6 +16,11 @@
 # - template-pass.txt (for if the build passed)
 # - template-fail.txt (for a build failure)
 
+# also:
+# sudo apt install docker.io jq at
+# sudo usermod -aG docker ${USER}
+# docker run hello-world
+
 # 11 13 * * * /bin/bash -c '. /home/jholland/src/chromium_fork/custom/CUSTOM.sh ; cd ${LOCATION} ; ./chromium-build-cron.sh'
 
 #. custom/CUSTOM.sh
