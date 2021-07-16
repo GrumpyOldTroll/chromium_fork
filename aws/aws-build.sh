@@ -55,6 +55,9 @@ aws --region ${REGION} ec2 run-instances \
   --key-name ${KEYPAIR} \
   --security-group-ids "${SGID}" \
   --block-device-mappings "DeviceName=/dev/sda1,Ebs={DeleteOnTermination=true,VolumeSize=${DISKSIZE}}" \
+  --tag-specifications \
+      "ResourceType=instance,Tags=[{Key=Name,Value=cbuild-inst-${NOW}}]" \
+      "ResourceType=volume,Tags=[{Key=Name,Value=cbuild-disk-${NOW}}]" \
   --count 1 \
   > ${RUNFILE}
 
