@@ -403,7 +403,8 @@ It's useful here to try building (and ideally tests), by entering the docker con
 
 ~~~
 docker start -i cbuild-${CHAN}
-autoninja -c out/Default chrome
+gn gen out/Default
+autoninja -C out/Default chrome
 ~~~
 
 If that works, we tag it:
