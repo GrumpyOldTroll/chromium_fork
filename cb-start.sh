@@ -132,6 +132,11 @@ echo "DIFF_SHA256=\"$(shasum -a 256 ${PATCHFILE} | awk '{print $1;}')\"" > out/D
 cp /tmp/env.sh out/Default/
 
 ./build/install-build-deps.sh --no-prompt
+
+# for some reason install-build-deps now removes python-is-python3, but
+# gclient sync fails without it with bad dependencies.
+sudo apt-get install -y python-is-python3
+
 gclient sync
 
 git apply ${PATCHFILE}

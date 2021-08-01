@@ -16,7 +16,7 @@ RUN apt-get update && \
       git \
       curl \
       jq \
-      python2.7 \
+      python2 \
       python3 \
       python-is-python3 \
       lsb-release \
