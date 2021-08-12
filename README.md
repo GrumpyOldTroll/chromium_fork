@@ -1,6 +1,6 @@
 # Overview
 
-This repo is for maintaining a [fork of chromium](https://github.com/GrumpyOldTroll/chromium) that includes a [multicast API](/https://github.com/GrumpyOldTroll/wicg-multicast-receiver-api), and to regularly sync it from upstream.  The target is to stay up to date daily with the latest dev and stable builds, with a 1-week grace period when manual fixes are needed.
+This repo is for maintaining a [fork of chromium](https://github.com/GrumpyOldTroll/chromium) that includes a [multicast API](https://github.com/GrumpyOldTroll/wicg-multicast-receiver-api), and to regularly sync it from upstream.  The target is to stay up to date daily with the latest dev and stable builds, with a 1-week grace period when manual fixes are needed.
 
 There's a set of URLS of recent builds in [CURRENT_BINARIES.stable.md](CURRENT_BINARIES.stable.md) and [CURRENT_BINARIES.dev.md](CURRENT_BINARIES.dev.md) with download links for .deb files.
 
