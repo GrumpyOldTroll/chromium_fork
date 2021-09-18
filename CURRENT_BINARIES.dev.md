@@ -1,3 +1,5 @@
+ * https://jholland-vids.edgesuite.net/chromium-builds/dev/chromium-browser-mc-unstable_95.0.4638.10-1_amd64.deb
+ * https://jholland-vids.edgesuite.net/chromium-builds/dev/chromium-browser-mc-unstable_95.0.4636.4-1_amd64.deb
  * https://jholland-vids.edgesuite.net/chromium-builds/dev/chromium-browser-mc-unstable_95.0.4628.3-1_amd64.deb
  * https://jholland-vids.edgesuite.net/chromium-builds/dev/chromium-browser-mc-unstable_95.0.4621.4-1_amd64.deb
  * https://jholland-vids.edgesuite.net/chromium-builds/dev/chromium-browser-mc-unstable_94.0.4606.20-1_amd64.deb
@@ -6,5 +8,3 @@
  * https://jholland-vids.edgesuite.net/chromium-builds/dev/chromium-browser-mc-unstable_94.0.4595.0-1_amd64.deb
  * https://jholland-vids.edgesuite.net/chromium-builds/dev/chromium-browser-mc-unstable_93.0.4577.18-1_amd64.deb
  * https://jholland-vids.edgesuite.net/chromium-builds/dev/chromium-browser-mc-unstable_93.0.4577.8-1_amd64.deb
- * https://jholland-vids.edgesuite.net/chromium-builds/dev/chromium-browser-mc-unstable_93.0.4573.0-1_amd64.deb
- * https://jholland-vids.edgesuite.net/chromium-builds/dev/chromium-browser-mc-unstable_93.0.4557.4-1_amd64.deb
