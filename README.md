@@ -4,14 +4,24 @@ This repo is for maintaining a [fork of chromium](https://github.com/GrumpyOldTr
 
 There's a set of URLS of recent builds in [CURRENT_BINARIES.stable.md](CURRENT_BINARIES.stable.md) and [CURRENT_BINARIES.dev.md](CURRENT_BINARIES.dev.md) with download links for .deb files.
 
-To download and run it against a page that can join multicast traffic and receive payloads in javascript, you can run it like this:
+To download and run it against a page that can join multicast traffic and receive payloads in javascript, you can install it like this:
 
 ~~~
 VER=<pick recent value from LAST_GOOD.stable.sh or CURRENT_BINARIES>
 curl -O https://jholland-vids.edgesuite.net/chromium-builds/dev/chromium-browser-mc-unstable_${VER}-1_amd64.deb
-sudo dpkg --install chromium-browser-mc-unstable_${VER}-1_amd64.deb
+sudo apt install chromium-browser-mc-unstable_${VER}-1_amd64.deb
+~~~
 
-URL="https://htmlpreview.github.io/?https://github.com/GrumpyOldTroll/wicg-multicast-receiver-api/blob/master/demo-multicast-receive-api.html"
+You can uninstall it like this:
+
+~~~
+sudo apt remove chromium-browser-mc-unstable
+~~~
+
+And you can run it like this:
+
+~~~
+URL="https://grumpyoldtroll.github.io/wicg-multicast-receiver-api/demo-multicast-receive-api.html"
 
 chromium-browser-mc-unstable --enable-blink-features=MulticastTransport ${URL}
 ~~~
@@ -91,10 +101,11 @@ Either way, there's a env.sh file stuck into `out/Default/env.sh` with some help
 
 Recommended in both the host and the container is to `. out/Default/env.sh` to set these variables in your shell while working, the rest of the commands will use these variables assuming they've been set.
 
-For doing rebases you may want to set [rerere](https://git-scm.com/book/en/v2/Git-Tools-Rerere):
+For doing rebases you may want to set [rerere](https://git-scm.com/book/en/v2/Git-Tools-Rerere).  Also, there's typically a warning about checking for renames unless you set the limit high:
 
 ~~~
 git config --global rerere.enabled true
+git config --global merge.renamelimit 15000
 ~~~
 
 ## Failure Modes
@@ -261,13 +272,13 @@ If it needs moving and has a different version branch, the commands you'll use f
 ~~~
 NEWBASE=$(git merge-base ${VERSION} main)
 git checkout --track multicast/multicast-base
-cp out/Default/env.sh ..
-# otherwise that can get annoyingly lost cleaning leftover junk:
-git clean -ffdx
-cp ../env.sh out/Default/env.sh
-git merge ${NEWBASE}
-# fix merge conflicts
-git commit -m "Merged to branch point for ${BP} releases"
+git status
+# if there's a lot of leftover stuff:
+# cp out/Default/env.sh .. ; cp out/Default/args.gn ..
+# git clean -ffdx
+# mkdir -p out/Default ; cp ../env.sh out/Default/env.sh ; cp ../args.gn out/Default/
+git merge  -m "Merged to branch point for ${BP} releases" ${NEWBASE}
+# fix merge conflicts and git merge --continue
 git tag -a -m "Branch point for adding multicast to ${BP} releases." mcbp-${BP}
 ~~~
 
