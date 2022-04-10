@@ -377,6 +377,12 @@ $ ( [ "$(git merge-base multicast-base main)" = "$(git merge-base ${VERSION} mai
 multicast-base ok to leave alone
 ~~~
 
+Or for stable:
+
+~~~
+( [ "$(git merge-base multicast-patch-${BP} main)" = "$(git merge-base ${VERSION} main)" ] && echo "multicast-patch-${BP} ok to leave alone" ) || echo "multicast-patch-${BP} still needs moving to 'git merge-base ${VERSION} main'"
+~~~
+
 This means the multicast-base branch is pointing at a particular commit from the upstream main branch, with the multicast API changes on top of it.  However, the commit from the main branch is never the same as the release commit.  (At the very least, the DEPS and chrome/VERSION files will be different.)
 
 At this point we make a branch off multicast-base, which is at a sort of "point in main+multicast" state, and rebase it to the release tag, which has extra changes since it was forked from main. If you are not already on the multicas-base branch, make sure to `git checkout multicast-base` (or `git checkout --track multicast/multicast-base`, if you didn't do it during the prior step), then make a local branch to rebase to the release tag inside it (the multicast-base branch SHOULD NOT be used for that rebase):
@@ -407,7 +413,7 @@ Most of the time this looks like:
 ~~~
 git checkout multicast-base
 git checkout -b dummy-patch
-git merge ${VERSION}
+git merge -m "Merge ${VERSION} on top of mcbp-${BP}" ${VERSION}
 ~~~
 
 It's useful here to try building (and ideally tests), by entering the docker container and running the build:
@@ -429,8 +435,8 @@ git tag -a -m "Multicast API patched onto ${VERSION}" mc-${VERSION}
 The diff between the new tag and the release tag is the patch that we want to use as the patch for nightly.sh, so we dump that to a local file (FD for FORKDIR):
 
 ~~~
-$ FD=${HOME}/src/chromium_fork
-$ git diff ${VERSION}..mc-${VERSION} > ${FD}/patches/from-${VERSION}-patch.diff
+FD=${HOME}/src/chromium_fork
+git diff ${VERSION}..mc-${VERSION} > ${FD}/patches/from-${VERSION}-patch.diff
 ~~~
 
 At this point we want to run the nightly build manually and ensure that it passes with this diff file against this target.
@@ -448,6 +454,7 @@ To run the build, you remove the old container and explicitly set USE_PATCH and 
 Remember if you're logged in remotely to do it from a tmux or screen, or something that won't stop the build if your connection gets killed (with the command below, you can access it later if you lose connection with `screen -ls` and `screen -x`):
 
 ~~~
+pushd ${FD}
 docker container rm cbuild-${CHAN}
 rm -f screen.${CHAN}.log
 screen -d -L -Logfile screen.${CHAN}.log -m /bin/bash -c "CHAN=${CHAN} USE_PATCH=patches/from-${VERSION}-patch.diff VER=${VERSION} ./nightly.sh"
@@ -512,7 +519,7 @@ $ git apply patch.txt
 $ git commit -m "extra fixes after rebase to ${VERSION}"
 $ git tag -a -m "Branch point for adding multicast to ${BP} releases." mcbp-${BP}
 $ git checkout -b patch-try3
-$ git rebase ${VERSION}
+$ git merge -m "Merge ${VERSION} on top of mcbp-${BP}" ${VERSION}
 $ git tag -a -m "Multicast API patched onto ${VERSION}" mc-${VERSION}
 $ FD=${HOME}/src/chromium_fork
 $ git diff ${VERSION}..mc-${VERSION} > ${FD}/patches/from-${VERSION}-patch.diff
