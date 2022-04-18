@@ -1,6 +1,8 @@
 
 After `git clone https://github.com/GrumpyOldTroll/chromium_fork` and `cd chromium_fork/quic_extension`, we basically follow the directions for [building chromium on Linux](https://chromium.googlesource.com/chromium/src/+/main/docs/linux/build_instructions.md), but pull in the multicast source from a fork and change the build command to build quic_server and quic_client instead.
 
+If you're feeling brave, pasting this **should** work, but I recommend going thru it a bit at a time to make sure each piece works.  Note that the `fetch chromium` step will probably take something like 3-5 hours.
+
 ~~~
 #sudo apt install -y python-is-python3
 sudo apt-get install -y python3-venv
