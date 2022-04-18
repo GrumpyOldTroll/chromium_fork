@@ -1,7 +1,7 @@
 
 After `git clone https://github.com/GrumpyOldTroll/chromium_fork` and `cd chromium_fork/quic_extension`, we basically follow the directions for [building chromium on Linux](https://chromium.googlesource.com/chromium/src/+/main/docs/linux/build_instructions.md), but pull in the multicast source from a fork and change the build command to build quic_server and quic_client instead.
 
-If you're feeling brave, pasting this **should** work, but I recommend going thru it a bit at a time to make sure each piece works.  Note that the `fetch chromium` step will probably take something like 3-5 hours.
+If you're feeling brave, pasting this **should** theoretically work, but I recommend going thru it a small piece at a time to make sure each piece works for you.  Note that the `fetch chromium` step will probably take something like 3-5 hours.
 
 ~~~
 #sudo apt install -y python-is-python3
@@ -80,16 +80,22 @@ wget -p --save-headers https://www.example.org
 
 popd
 
-./out/Default/quic_server --quic_ietf_draft --quic_response_cache_dir=/tmp/quic-data/www.example.org --certificate_file=net/tools/quic/certs/out/leaf_cert.pem --key_file=net/tools/quic/certs/out/leaf_cert.pkcs8
+./out/Default/quic_server --quic_ietf_draft \
+  --quic_response_cache_dir=/tmp/quic-data/www.example.org \
+  --certificate_file=net/tools/quic/certs/out/leaf_cert.pem \
+  --key_file=net/tools/quic/certs/out/leaf_cert.pkcs8
 
 
-./out/Default/quic_client --host=127.0.0.1 --port=6121 --disable_certificate_verification https://www.example.org/
+./out/Default/quic_client --host=127.0.0.1 --port=6121 \
+  --disable_certificate_verification https://www.example.org/
 ~~~
 
 If you want to run chromium vs. the quic_server, I recommend using a new profile and also you'll need to pass your local generated key's fingerprint, as well as telling chromium to use your quic server instead of dns:
 
 ~~~
-openssl x509 -pubkey < "net/tools/quic/certs/out/leaf_cert.pem" | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64 > "/tmp/fingerprints.txt"
+openssl x509 -pubkey < "net/tools/quic/certs/out/leaf_cert.pem" | \
+  openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | \
+  base64 > "/tmp/fingerprints.txt"
 
 mkdir -p /tmp/chrome-tmp-profile/Default
 touch "/tmp/chrome-tmp-profile/First Run"
@@ -99,6 +105,10 @@ echo '{ "browser": { "has_seen_welcome_page": true }}' > /tmp/chrome-tmp-profile
 # for more limited logging, a tab with chrome://net-export instead.
 # https://www.chromium.org/for-testers/providing-network-details
 
-google-chrome --user-data-dir=/tmp/chrome-tmp-profile --no-proxy-server --enable-quic --origin-to-force-quic-on=www.example.org:443 --host-resolver-rules='MAP www.example.org:443 127.0.0.1:6121'  --ignore-certificate-errors-spki-list=$(cat /tmp/fingerprints.txt) --log-net-log=/tmp/chrome-net-log.json https://www.example.org/
+google-chrome --user-data-dir=/tmp/chrome-tmp-profile --no-proxy-server \
+  --enable-quic --origin-to-force-quic-on=www.example.org:443 \
+  --host-resolver-rules='MAP www.example.org:443 127.0.0.1:6121' \
+  --ignore-certificate-errors-spki-list=$(cat /tmp/fingerprints.txt) \
+  --log-net-log=/tmp/chrome-net-log.json https://www.example.org/
 ~~~
 
