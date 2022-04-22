@@ -28,7 +28,7 @@ fi
 
 mkdir -p work
 cd work
-fetch chromium
+fetch chromium --no-history
 cd src/
 
 mkdir -p out/Default
@@ -60,7 +60,7 @@ popd
 gclient sync
 gn gen out/Default
 
-ninja -C out/Default quic_server quic_client
+ninja -C out/Default epoll_quic_server epoll_quic_client
 
 pushd net/tools/quic/certs
 ./generate-certs.sh
@@ -80,13 +80,13 @@ wget -p --save-headers https://www.example.org
 
 popd
 
-./out/Default/quic_server --quic_ietf_draft \
+./out/Default/epoll_quic_server --quic_ietf_draft \
   --quic_response_cache_dir=/tmp/quic-data/www.example.org \
   --certificate_file=net/tools/quic/certs/out/leaf_cert.pem \
   --key_file=net/tools/quic/certs/out/leaf_cert.pkcs8
 
 
-./out/Default/quic_client --host=127.0.0.1 --port=6121 \
+./out/Default/epoll_quic_client --host=127.0.0.1 --port=6121 \
   --disable_certificate_verification https://www.example.org/
 ~~~
 
@@ -111,4 +111,16 @@ google-chrome --user-data-dir=/tmp/chrome-tmp-profile --no-proxy-server \
   --ignore-certificate-errors-spki-list=$(cat /tmp/fingerprints.txt) \
   --log-net-log=/tmp/chrome-net-log.json https://www.example.org/
 ~~~
+
+---
+
+Notes:
+
+Originally (and according to the "playing with quic" instructions) this used quic_server and quic_client instead of epoll_quic_server and epoll_quic_client.
+
+These appear to have similar behavior (and both specifically disclaim any performant operation), but e.g. epoll_quic_server has entry points at net/third_party/quiche/src/quic/tools/quic_server.cc instead of net/tools/quic/quic_simple_server.cc, and at net/third_party/quiche/src/quic/tools/quic_server_bin.cc instead of net/tools/quic/quic_simple_server_bin.cc.  (Notably, both of these use net/third_party/quiche/src/quic/tools/quic_toy_server.cc.)
+
+I propose to do our initial work on the epoll implementation in net/third_party/quiche/src/quic instead of the "simple" implementation in net/tools/quic, where we have any divergence.  (And we will need to have some early divergence, specifically in the pipe handling at the root's pusher.)
+
+I'll rate it a nice-to-have to include a non-epoll version as well (and probably necessary before a one-day upstream PR) but I'll assign it a low priority while we're doing an initial pass.
 
