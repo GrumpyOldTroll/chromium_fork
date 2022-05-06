@@ -28,7 +28,7 @@ fi
 
 mkdir -p work
 cd work
-fetch chromium --no-history
+fetch chromium
 cd src/
 
 mkdir -p out/Default
