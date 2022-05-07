@@ -39,13 +39,16 @@ git fetch multicast
 git checkout quic-multicast-dev
 popd
 
+git apply /base/fix.patch
 ./build/install-build-deps.sh --no-prompt
 gclient sync -D
 
 pushd net/third_party/quiche/src
 git checkout quic-multicast-dev
+git pull
 popd
 git checkout quic-multicast-dev
+git pull
 
 mkdir -p out/Default
 cat > out/Default/args.gn <<EOF

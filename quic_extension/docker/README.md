@@ -13,11 +13,11 @@ The first run is for coming up starting with nothing but this directory.
 ### Build Initial Image
 
 ~~~
-docker build -t quiche-builder:latest \
+docker build -t qbuilder:latest \
     --build-arg USER_ID=$(id -u ${USER}) \
     --build-arg GROUP_ID=$(id -g ${USER}) \
     --build-arg GITEMAIL=$(git config user.email) \
-    --build-arg GITNAME="$(git config user.name)"
+    --build-arg GITNAME="$(git config user.name)" \
   -f ./Dockerfile .
 ~~~
 
@@ -28,10 +28,9 @@ This should take a while but should complete successfully:
 ~~~
 SRCDIR=~/mc/quiche-work
 mkdir -p ${SRCDIR}
-docker run -it --name quiche-build \
+docker run -it --name qbuild \
   --mount type=bind,src="${SRCDIR}",dst=/build \
-  --mount type=bind,src=/run/snapd.socket,dst=/run/snapd.socket \
-  quiche-builder:latest
+  qbuilder:latest
 ~~~
 
 Afterwards, you should have a `src` directory under ${SRCDIR}, and it should contain the [chromium source tree](https://github.com/chromium/chromium).  It should also be sync'd to the [quic-multicast-dev](https://github.com/GrumpyOldTroll/chromium/tree/quic-multicast-dev) branch of the quic multicast fork, plus the depot_tools that were used in the build:
@@ -57,7 +56,7 @@ Your branch is up to date with 'multicast/quic-multicast-dev'.
 Once you've got the setup/fetch performed, you can launch the build part by running this way:
 
 ~~~
-docker start -i quiche-build
+docker start -i qbuild
 ~~~
 
 That enters the docker context, where you can run ninja.
@@ -87,5 +86,5 @@ Options:
 
 From here you can `cd ${SRCDIR}/src` and do the rest of the steps in <../README.md> (making a local cert, running server and client, etc.).  These likewise can optionally be run from inside the container if preferred.
 
-If you need multiple shells inside the container, your 2nd shell can run `docker exec -it quiche-build /bin/bash`.  (If you run start -i a second time, you'll end up sharing a single shell across multiple terminals, probably not what you want.)
+If you need multiple shells inside the container, your 2nd shell can run `docker exec -it qbuild /bin/bash`.  (If you run start -i a second time, you'll end up sharing a single shell across multiple terminals, probably not what you want.)
 

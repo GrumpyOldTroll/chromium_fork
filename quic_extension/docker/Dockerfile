@@ -1,4 +1,5 @@
-FROM ubuntu:20.04
+#FROM ubuntu:20.04
+FROM debian:testing-backports
 LABEL maintainer="jholland@akamai.com"
 
 ENV container docker
@@ -29,6 +30,7 @@ RUN apt-get update && \
 
 RUN mkdir /base
 COPY initial-run.sh /base/initial-run.sh
+COPY fix.patch /base/fix.patch
 RUN chmod +x /base/initial-run.sh
 
 RUN echo "qbuild ALL=NOPASSWD: ALL" | tee -a /etc/sudoers
