@@ -25,13 +25,15 @@ if [ ! -d depot_tools ]; then
   git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
 fi
 
-fetch chromium
+fetch --no-history chromium
 
 cd src/
+git fetch --unshallow
 
 git remote add multicast https://github.com/GrumpyOldTroll/chromium.git
 git fetch multicast
 git checkout quic-multicast-dev
+git pull --all
 
 pushd net/third_party/quiche/src
 git remote add multicast https://github.com/GrumpyOldTroll/quiche.git

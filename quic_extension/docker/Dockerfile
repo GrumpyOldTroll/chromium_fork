@@ -20,6 +20,7 @@ RUN apt-get update && \
       snapd \
       build-essential \
       curl \
+      file \
       git \
       python3 \
       python-is-python3 \
@@ -59,6 +60,8 @@ RUN if [ ${USER_ID:-0} -ne 0 ] && [ ${GROUP_ID:-0} -ne 0 ]; then \
 
 USER qbuild
 
+# trying some hacks from https://stackoverflow.com/questions/21277806/fatal-early-eof-fatal-index-pack-failed
+
 ARG GITNAME
 ARG GITEMAIL
 
@@ -68,6 +71,11 @@ RUN if [ ! -z "${GITNAME}" -a ! -z "${GITEMAIL}" ]; then \
   else \
     echo "Run docker build with --build-arg GITEMAIL=\$(git config user.email) --build-arg GITNAME=\"\$(git config user.name)\""  && \
     exit 1; \
-  fi
+  fi && \
+  git config --global core.packedGitLimit 4096m && \
+  git config --global core.packedGitWindowSize 4096m && \
+  git config --global pack.deltaCacheSize 4096m && \
+  git config --global pack.packSizeLimit 4096m && \
+  git config --global pack.windowsMemory 4096m
 
 ENTRYPOINT [ "/base/initial-run.sh" ]
